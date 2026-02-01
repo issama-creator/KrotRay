@@ -20,8 +20,8 @@ body {
 
 .app {
   min-height: 100vh;
-  padding: 0 20px 32px;
-  padding-bottom: calc(32px + var(--tg-safe-area-inset-bottom, 0px));
+  padding: 0 16px 16px;
+  padding-bottom: calc(16px + var(--tg-safe-area-inset-bottom, 0px));
   padding-top: var(--tg-safe-area-inset-top, 0);
 }
 
@@ -112,26 +112,26 @@ body {
 
 /* Тарифы */
 .tariffs {
-  margin-bottom: 24px;
+  padding: 16px 0;
+  margin-bottom: 0;
 }
 
 .tariffs__note {
-  margin: 0 0 14px;
-  font-size: 12px;
+  margin: 0 0 12px;
+  font-size: 14px;
   color: var(--tg-theme-hint-color, #71717a);
 }
 
 .tariff-options {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .tariff-row {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 14px 0;
+  padding: 12px 0;
   background: none;
   border: none;
   cursor: pointer;
@@ -147,8 +147,8 @@ body {
 
 .tariff-row__radio {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border: 2px solid var(--tg-theme-hint-color, #94a3b8);
   border-radius: 50%;
   transition: border-color 0.2s, background 0.2s;
@@ -165,7 +165,7 @@ body {
 }
 
 .tariff-row__period {
-  flex: 0 0 auto;
+  flex: 1;
   font-size: 16px;
   font-weight: 600;
   color: var(--tg-theme-text-color, #e4e4e7);
@@ -173,29 +173,33 @@ body {
 
 .tariff-row__price {
   flex: 0 0 auto;
-  margin-left: 16px;
   font-size: 16px;
   font-weight: 700;
   color: #ec4899;
 }
 
 .tariff-savings {
-  margin: 6px 0 0 30px;
+  margin: 4px 0 0 32px;
   font-size: 14px;
-  color: var(--tg-theme-text-color, #e4e4e7);
+  color: #22c55e;
 }
 
 .tariff-savings .tariff-savings__amount {
-  color: #ec4899;
+  color: #22c55e;
   font-weight: 600;
 }
 
 .buy-section {
-  margin-top: 20px;
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.buy-section .btn_large {
+  margin-bottom: 12px;
 }
 
 .buy-section .payment-note {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 /* Кнопки */
@@ -203,7 +207,7 @@ body {
   width: 100%;
   padding: 0;
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -234,8 +238,10 @@ body {
 }
 
 .btn_large {
-  padding: 16px 24px;
+  min-height: 48px;
+  padding: 14px 24px;
   font-size: 17px;
+  border-radius: 12px;
 }
 
 .btn_small {
