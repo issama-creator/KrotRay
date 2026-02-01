@@ -14,6 +14,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .app {
   min-height: 100vh;
   padding: 0 20px 32px;
@@ -35,22 +39,46 @@ body {
   color: var(--tg-theme-text-color, #e4e4e7);
 }
 
-/* Info cards — статус и подписка */
+.section-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
 .content {
   padding-top: 24px;
 }
 
-.info-cards {
+/* 1. Подписка */
+.subscription-info {
+  margin-bottom: 24px;
+}
+
+.subscription-info_no-sub .subscription-info__text {
+  display: block;
+  padding: 20px;
+  background: var(--tg-theme-secondary-bg-color, #18181b);
+  border-radius: 16px;
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color, #a1a1aa);
+  margin: 0;
+}
+
+.subscription-info_has-sub .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 28px;
 }
 
 .info-card {
   background: var(--tg-theme-secondary-bg-color, #18181b);
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: 14px;
+  padding: 16px;
   border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.06));
 }
 
@@ -59,42 +87,196 @@ body {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--tg-theme-hint-color, #71717a);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .info-card__value {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--tg-theme-text-color, #e4e4e7);
 }
 
-/* Тарифы */
-.tariffs__title {
-  margin: 0 0 14px;
-  font-size: 13px;
+.info-card__value.status_active {
+  color: #22c55e;
+}
+
+.info-card__value.status_expired {
+  color: var(--tg-theme-destructive-text-color, #ef4444);
+}
+
+/* 2. Ключ */
+.key-section {
+  margin-bottom: 24px;
+}
+
+.payment-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #71717a);
+  text-align: center;
+}
+
+.key-section__label {
+  margin: 0 0 10px;
+  font-size: 14px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  color: var(--tg-theme-text-color, #e4e4e7);
+}
+
+.key-field {
+  margin-bottom: 12px;
+}
+
+.key-field__input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--tg-theme-secondary-bg-color, #18181b);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: monospace;
+  color: var(--tg-theme-text-color, #e4e4e7);
+}
+
+.key-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.key-actions .btn_small {
+  flex: 1;
+}
+
+.key-status {
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
+.key-status.active {
+  color: #22c55e;
+}
+
+.key-status.revoked {
+  color: var(--tg-theme-destructive-text-color, #ef4444);
+}
+
+.key-section_loading {
+  text-align: center;
+  padding: 24px;
+}
+
+.loader {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 12px;
+  border: 3px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.2));
+  border-top-color: var(--tg-theme-button-color, #3b82f6);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.key-section_loading p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
+/* 3. Инструкции accordion */
+.instructions {
+  margin-bottom: 24px;
+}
+
+.accordion {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--tg-theme-secondary-bg-color, #18181b);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #e4e4e7);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+
+.accordion::after {
+  content: "▼";
+  font-size: 10px;
+  opacity: 0.6;
+  transition: transform 0.2s;
+}
+
+.accordion.open::after {
+  transform: rotate(180deg);
+}
+
+.accordion:active {
+  opacity: 0.9;
+}
+
+.accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+}
+
+.accordion-content.open {
+  max-height: 120px;
+}
+
+.accordion-content .instruction-list {
+  padding: 12px 16px 16px;
+  margin: 0 0 6px;
+  background: var(--tg-theme-secondary-bg-color, #18181b);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.06));
+  border-radius: 0 0 12px 12px;
+  border-top: none;
+  list-style-position: inside;
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #a1a1aa);
+  line-height: 1.6;
+}
+
+/* 4. Тарифы */
+.tariffs {
+  margin-bottom: 24px;
+}
+
+.tariffs__note {
+  margin: 0 0 14px;
+  font-size: 12px;
   color: var(--tg-theme-hint-color, #71717a);
 }
 
 .tariff-options {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .tariff-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 18px 20px;
+  padding: 16px 18px;
   background: var(--tg-theme-secondary-bg-color, #18181b);
   border: 2px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
-  border-radius: 16px;
+  border-radius: 14px;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
   text-align: left;
@@ -116,16 +298,8 @@ body {
   background: color-mix(in srgb, var(--tg-theme-button-color, #3b82f6) 12%, transparent);
 }
 
-.tariff-card__period {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--tg-theme-text-color, #e4e4e7);
-}
-
-.tariff-card__price {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--tg-theme-button-color, #3b82f6);
+.tariff-card_recommended {
+  border-color: var(--tg-theme-button-color, #3b82f6);
 }
 
 .tariff-card__badge {
@@ -137,14 +311,29 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--tg-theme-button-color, #3b82f6);
-  opacity: 0.9;
 }
 
-/* Кнопка */
-.actions {
-  margin-top: 28px;
+.tariff-card__period {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #e4e4e7);
 }
 
+.tariff-card__price {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--tg-theme-button-color, #3b82f6);
+}
+
+.tariff-card__savings {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+/* Кнопки */
 .btn {
   width: 100%;
   padding: 0;
@@ -157,9 +346,14 @@ body {
   font-family: inherit;
 }
 
-.btn:active {
+.btn:active:not(:disabled) {
   opacity: 0.9;
   transform: scale(0.99);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn_primary {
@@ -168,7 +362,47 @@ body {
   box-shadow: 0 4px 14px color-mix(in srgb, var(--tg-theme-button-color, #3b82f6) 35%, transparent);
 }
 
+.btn_secondary {
+  background: var(--tg-theme-secondary-bg-color, #18181b);
+  color: var(--tg-theme-text-color, #e4e4e7);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.15));
+}
+
 .btn_large {
   padding: 16px 24px;
   font-size: 17px;
+}
+
+.btn_small {
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+/* 5. Поддержка и доверие */
+.footer {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.06));
+}
+
+.footer__support {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #a1a1aa);
+}
+
+.footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer__link {
+  font-size: 12px;
+  color: var(--tg-theme-link-color, #60a5fa);
+  text-decoration: none;
+}
+
+.footer__link:hover {
+  text-decoration: underline;
 }

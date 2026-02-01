@@ -14,35 +14,110 @@
     </header>
 
     <main class="content">
-      <section class="info-cards">
-        <div class="info-card">
-          <span class="info-card__label">Статус</span>
-          <span class="info-card__value" id="status-value">—</span>
+      <!-- 1. Информация о подписке -->
+      <section class="subscription-info" id="subscription-section">
+        <div class="subscription-info_no-sub" id="no-sub-block">
+          <p class="subscription-info__text">Подписка не активна</p>
         </div>
-        <div class="info-card">
-          <span class="info-card__label">Подписка до</span>
-          <span class="info-card__value" id="subscription-value">—</span>
+        <div class="subscription-info_has-sub hidden" id="has-sub-block">
+          <div class="info-grid">
+            <div class="info-card">
+              <span class="info-card__label">Статус</span>
+              <span class="info-card__value" id="status-value">—</span>
+            </div>
+            <div class="info-card">
+              <span class="info-card__label">Подписка до</span>
+              <span class="info-card__value" id="subscription-value">—</span>
+            </div>
+            <div class="info-card">
+              <span class="info-card__label">Тариф</span>
+              <span class="info-card__value" id="tariff-value">—</span>
+            </div>
+            <div class="info-card">
+              <span class="info-card__label">Осталось дней</span>
+              <span class="info-card__value" id="days-value">—</span>
+            </div>
+          </div>
         </div>
       </section>
 
+      <!-- 2. Ключ / доступ -->
+      <section class="key-section">
+        <div class="key-section_no-key" id="no-key-block">
+          <button type="button" class="btn btn_primary btn_large" id="btn-get-key">Получить ключ</button>
+          <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
+        </div>
+        <div class="key-section_has-key hidden" id="has-key-block">
+          <p class="key-section__label">Ключ уже выдан</p>
+          <div class="key-field">
+            <input type="text" class="key-field__input" id="key-input" readonly value="">
+          </div>
+          <div class="key-actions">
+            <button type="button" class="btn btn_secondary btn_small" id="btn-copy">Скопировать</button>
+            <button type="button" class="btn btn_secondary btn_small" id="btn-qr">Показать QR</button>
+          </div>
+          <span class="key-status" id="key-status">Активен</span>
+        </div>
+        <div class="key-section_loading hidden" id="payment-loading-block">
+          <div class="loader"></div>
+          <p>Оплата в процессе...</p>
+        </div>
+      </section>
+
+      <!-- 3. Инструкции (accordion) -->
+      <section class="instructions">
+        <button type="button" class="accordion" data-target="android">Android</button>
+        <div class="accordion-content" id="accordion-android">
+          <ol class="instruction-list">
+            <li>Скачайте клиент</li>
+            <li>Вставьте ключ</li>
+            <li>Подключитесь</li>
+          </ol>
+        </div>
+        <button type="button" class="accordion" data-target="ios">iOS</button>
+        <div class="accordion-content" id="accordion-ios">
+          <ol class="instruction-list">
+            <li>Скачайте клиент</li>
+            <li>Вставьте ключ</li>
+            <li>Подключитесь</li>
+          </ol>
+        </div>
+        <button type="button" class="accordion" data-target="desktop">Windows / macOS</button>
+        <div class="accordion-content" id="accordion-desktop">
+          <ol class="instruction-list">
+            <li>Скачайте клиент</li>
+            <li>Вставьте ключ</li>
+            <li>Подключитесь</li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- 4. Тарифы -->
       <section class="tariffs">
-        <h2 class="tariffs__title">Тарифы</h2>
+        <h2 class="section-title">Тарифы</h2>
+        <p class="tariffs__note">Один ключ · Одно устройство</p>
         <div class="tariff-options">
           <button type="button" class="tariff-card" data-months="1" data-price="100" id="tariff-1">
             <span class="tariff-card__period">1 месяц</span>
             <span class="tariff-card__price">100 ₽</span>
           </button>
-          <button type="button" class="tariff-card tariff-card_selected" data-months="3" data-price="250" id="tariff-3">
+          <button type="button" class="tariff-card tariff-card_selected tariff-card_recommended" data-months="3" data-price="250" id="tariff-3">
+            <span class="tariff-card__badge">Рекомендуем</span>
             <span class="tariff-card__period">3 месяца</span>
             <span class="tariff-card__price">250 ₽</span>
-            <span class="tariff-card__badge">Выгодно</span>
+            <span class="tariff-card__savings">Экономия 50 ₽</span>
           </button>
         </div>
       </section>
 
-      <div class="actions">
-        <button type="button" class="btn btn_primary btn_large" id="btn-get-key">Получить ключ</button>
-      </div>
+      <!-- 5. Поддержка и доверие -->
+      <footer class="footer">
+        <p class="footer__support">Поддержка: <a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">@krotraybot</a></p>
+        <div class="footer__links">
+          <a href="#privacy" class="footer__link">Политика конфиденциальности</a>
+          <a href="#terms" class="footer__link">Условия использования</a>
+        </div>
+      </footer>
     </main>
   </div>
 
