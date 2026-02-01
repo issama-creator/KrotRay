@@ -17,7 +17,7 @@
       <!-- 1. Информация о подписке -->
       <section class="subscription-info" id="subscription-section">
         <div class="subscription-info_no-sub" id="no-sub-block">
-          <p class="subscription-info__text">Подписка не активна</p>
+          <p class="subscription-info__text">Ключ не активен</p>
         </div>
         <div class="subscription-info_has-sub hidden" id="has-sub-block">
           <div class="info-grid">
@@ -43,9 +43,7 @@
 
       <!-- 2. Ключ / доступ -->
       <section class="key-section">
-        <div class="key-section_no-key" id="no-key-block">
-          <button type="button" class="btn btn_primary btn_large" id="btn-get-key">Получить ключ</button>
-          <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
+        <div class="key-section_no-key hidden" id="no-key-block">
         </div>
         <div class="key-section_has-key hidden" id="has-key-block">
           <p class="key-section__label">Ключ уже выдан</p>
@@ -69,26 +67,25 @@
         <h2 class="section-title">Тарифы</h2>
         <p class="tariffs__note">Один ключ · Одно устройство</p>
         <div class="tariff-options">
-          <button type="button" class="tariff-card" data-months="1" data-price="100" id="tariff-1">
+          <button type="button" class="tariff-card tariff-card_selected" data-months="1" data-price="100" id="tariff-1">
             <span class="tariff-card__period">1 месяц</span>
             <span class="tariff-card__price">100 ₽</span>
           </button>
-          <button type="button" class="tariff-card tariff-card_selected tariff-card_recommended" data-months="3" data-price="250" id="tariff-3">
+          <button type="button" class="tariff-card tariff-card_recommended" data-months="3" data-price="250" id="tariff-3">
             <span class="tariff-card__badge">Рекомендуем</span>
             <span class="tariff-card__period">3 месяца</span>
             <span class="tariff-card__price">250 ₽</span>
             <span class="tariff-card__savings">Экономия 50 ₽</span>
           </button>
         </div>
+        <div class="buy-section" id="buy-section">
+          <button type="button" class="btn btn_primary btn_large" id="btn-buy-key">Купить ключ</button>
+          <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
+        </div>
       </section>
 
-      <!-- 5. Поддержка и доверие -->
       <footer class="footer">
         <p class="footer__support">Поддержка: <a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">@krotraybot</a></p>
-        <div class="footer__links">
-          <a href="#privacy" class="footer__link">Политика конфиденциальности</a>
-          <a href="#terms" class="footer__link">Условия использования</a>
-        </div>
       </footer>
     </main>
   </div>

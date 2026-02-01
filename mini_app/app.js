@@ -23,7 +23,7 @@
       ? "PAYMENT_PENDING"
       : "NO_SUBSCRIPTION";
 
-  var selectedTariff = { months: 3, price: 250 };
+  var selectedTariff = { months: 1, price: 100 };
 
   function render() {
     var noSubBlock = document.getElementById("no-sub-block");
@@ -31,13 +31,15 @@
     var noKeyBlock = document.getElementById("no-key-block");
     var hasKeyBlock = document.getElementById("has-key-block");
     var paymentLoadingBlock = document.getElementById("payment-loading-block");
-    var btnGetKey = document.getElementById("btn-get-key");
+    var buySection = document.getElementById("buy-section");
+    var btnBuyKey = document.getElementById("btn-buy-key");
 
     noSubBlock.classList.toggle("hidden", STATE !== "NO_SUBSCRIPTION");
     hasSubBlock.classList.toggle("hidden", STATE === "NO_SUBSCRIPTION");
-    noKeyBlock.classList.toggle("hidden", STATE === "ACTIVE" || STATE === "PAYMENT_PENDING");
+    noKeyBlock.classList.add("hidden");
     hasKeyBlock.classList.toggle("hidden", STATE !== "ACTIVE");
     paymentLoadingBlock.classList.toggle("hidden", STATE !== "PAYMENT_PENDING");
+    buySection.classList.toggle("hidden", STATE === "ACTIVE" || STATE === "PAYMENT_PENDING");
 
     if (STATE === "ACTIVE") {
       document.getElementById("status-value").textContent = "Активна";
@@ -57,7 +59,7 @@
     }
 
     if (STATE === "NO_SUBSCRIPTION" || STATE === "EXPIRED") {
-      btnGetKey.textContent = STATE === "EXPIRED" ? "Продлить подписку" : "Получить ключ";
+      btnBuyKey.textContent = STATE === "EXPIRED" ? "Продлить подписку" : "Купить ключ";
     }
   }
 
@@ -83,8 +85,8 @@
     setSelected(this);
   });
 
-  // Получить ключ — переход на оплату (реальная оплата в Итерации 5)
-  document.getElementById("btn-get-key").addEventListener("click", function () {
+  // Купить ключ — переход на оплату (реальная оплата в Итерации 5)
+  document.getElementById("btn-buy-key").addEventListener("click", function () {
     tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
     tg.showAlert &&
       tg.showAlert(
