@@ -165,13 +165,15 @@ body {
 }
 
 .tariff-row__period {
-  flex: 1;
+  flex: 0 0 auto;
   font-size: 16px;
   font-weight: 600;
   color: var(--tg-theme-text-color, #e4e4e7);
 }
 
 .tariff-row__price {
+  flex: 0 0 auto;
+  margin-left: 16px;
   font-size: 16px;
   font-weight: 700;
   color: #ec4899;
