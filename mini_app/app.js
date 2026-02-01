@@ -63,26 +63,6 @@
 
   render();
 
-  // Accordion — инструкции
-  document.querySelectorAll(".accordion").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-      var target = btn.dataset.target;
-      var content = document.getElementById("accordion-" + target);
-      var isOpen = content.classList.contains("open");
-      document.querySelectorAll(".accordion-content").forEach(function (c) {
-        c.classList.remove("open");
-      });
-      document.querySelectorAll(".accordion").forEach(function (b) {
-        b.classList.remove("open");
-      });
-      if (!isOpen) {
-        content.classList.add("open");
-        btn.classList.add("open");
-      }
-    });
-  });
-
   // Выбор тарифа
   function setSelected(card) {
     document.querySelectorAll(".tariff-card").forEach(function (c) {

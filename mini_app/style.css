@@ -188,69 +188,7 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-/* 3. Инструкции accordion */
-.instructions {
-  margin-bottom: 24px;
-}
-
-.accordion {
-  width: 100%;
-  padding: 14px 16px;
-  background: var(--tg-theme-secondary-bg-color, #18181b);
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
-  border-radius: 12px;
-  margin-bottom: 6px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--tg-theme-text-color, #e4e4e7);
-  text-align: left;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-family: inherit;
-  transition: background 0.2s;
-}
-
-.accordion::after {
-  content: "▼";
-  font-size: 10px;
-  opacity: 0.6;
-  transition: transform 0.2s;
-}
-
-.accordion.open::after {
-  transform: rotate(180deg);
-}
-
-.accordion:active {
-  opacity: 0.9;
-}
-
-.accordion-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.2s ease;
-}
-
-.accordion-content.open {
-  max-height: 120px;
-}
-
-.accordion-content .instruction-list {
-  padding: 12px 16px 16px;
-  margin: 0 0 6px;
-  background: var(--tg-theme-secondary-bg-color, #18181b);
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.06));
-  border-radius: 0 0 12px 12px;
-  border-top: none;
-  list-style-position: inside;
-  font-size: 14px;
-  color: var(--tg-theme-hint-color, #a1a1aa);
-  line-height: 1.6;
-}
-
-/* 4. Тарифы */
+/* Тарифы */
 .tariffs {
   margin-bottom: 24px;
 }
