@@ -10,25 +10,44 @@
     tg.setBackgroundColor(tg.themeParams.bg_color);
   }
 
-  // Авторизация через initData (итерация 2 — только наличие, проверка на backend в итерации 4)
   var initData = tg.initData || "";
   var hasInitData = initData.length > 0;
 
-  // Mock-данные (заглушки)
   var mockStatus = hasInitData ? "Активен" : "Нет данных";
-  var mockSubscription = hasInitData ? "До 01.04.2025" : "—";
+  var mockSubscription = hasInitData ? "01.04.2025" : "—";
 
   document.getElementById("status-value").textContent = mockStatus;
   document.getElementById("subscription-value").textContent = mockSubscription;
 
-  // Заглушки кнопок
-  document.getElementById("btn-pay").addEventListener("click", function () {
-    tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
-    tg.showAlert && tg.showAlert("Оплата будет доступна в следующей версии.");
+  // Выбор тарифа: 1 мес 100₽, 3 мес 300₽
+  var selectedTariff = { months: 3, price: 250 };
+
+  function setSelected(card) {
+    var cards = document.querySelectorAll(".tariff-card");
+    cards.forEach(function (c) {
+      c.classList.remove("tariff-card_selected");
+    });
+    card.classList.add("tariff-card_selected");
+    selectedTariff.months = parseInt(card.dataset.months, 10);
+    selectedTariff.price = parseInt(card.dataset.price, 10);
+  }
+
+  document.getElementById("tariff-1").addEventListener("click", function () {
+    tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+    setSelected(this);
   });
 
-  document.getElementById("btn-config").addEventListener("click", function () {
-    tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
-    tg.showAlert && tg.showAlert("Получение конфига будет доступно в следующей версии.");
+  document.getElementById("tariff-3").addEventListener("click", function () {
+    tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+    setSelected(this);
+  });
+
+  // Получить ключ — переход на оплату (реальная оплата в итерации 5)
+  document.getElementById("btn-get-key").addEventListener("click", function () {
+    tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+    tg.showAlert &&
+      tg.showAlert(
+        "Тариф: " + selectedTariff.months + " мес, " + selectedTariff.price + " ₽. Оплата будет подключена в следующей версии."
+      );
   });
 })();

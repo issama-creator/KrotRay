@@ -14,19 +14,34 @@
     </header>
 
     <main class="content">
-      <section class="card">
-        <h2 class="card__title">Статус</h2>
-        <p class="card__value" id="status-value">—</p>
+      <section class="info-cards">
+        <div class="info-card">
+          <span class="info-card__label">Статус</span>
+          <span class="info-card__value" id="status-value">—</span>
+        </div>
+        <div class="info-card">
+          <span class="info-card__label">Подписка до</span>
+          <span class="info-card__value" id="subscription-value">—</span>
+        </div>
       </section>
 
-      <section class="card">
-        <h2 class="card__title">Подписка</h2>
-        <p class="card__value" id="subscription-value">—</p>
+      <section class="tariffs">
+        <h2 class="tariffs__title">Тарифы</h2>
+        <div class="tariff-options">
+          <button type="button" class="tariff-card" data-months="1" data-price="100" id="tariff-1">
+            <span class="tariff-card__period">1 месяц</span>
+            <span class="tariff-card__price">100 ₽</span>
+          </button>
+          <button type="button" class="tariff-card tariff-card_selected" data-months="3" data-price="250" id="tariff-3">
+            <span class="tariff-card__period">3 месяца</span>
+            <span class="tariff-card__price">250 ₽</span>
+            <span class="tariff-card__badge">Выгодно</span>
+          </button>
+        </div>
       </section>
 
       <div class="actions">
-        <button type="button" class="btn btn_primary" id="btn-pay">Оплатить</button>
-        <button type="button" class="btn btn_secondary" id="btn-config">Получить конфиг</button>
+        <button type="button" class="btn btn_primary btn_large" id="btn-get-key">Получить ключ</button>
       </div>
     </main>
   </div>
