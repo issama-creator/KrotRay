@@ -26,40 +26,34 @@
   var selectedTariff = { months: 1, price: 100 };
 
   function render() {
-    var noSubBlock = document.getElementById("no-sub-block");
-    var hasSubBlock = document.getElementById("has-sub-block");
-    var noKeyBlock = document.getElementById("no-key-block");
+    var statusText = document.getElementById("status-text");
     var hasKeyBlock = document.getElementById("has-key-block");
-    var paymentLoadingBlock = document.getElementById("payment-loading-block");
     var buySection = document.getElementById("buy-section");
     var btnBuyKey = document.getElementById("btn-buy-key");
 
-    noSubBlock.classList.toggle("hidden", STATE !== "NO_SUBSCRIPTION");
-    hasSubBlock.classList.toggle("hidden", STATE === "NO_SUBSCRIPTION");
-    noKeyBlock.classList.add("hidden");
-    hasKeyBlock.classList.toggle("hidden", STATE !== "ACTIVE");
-    paymentLoadingBlock.classList.toggle("hidden", STATE !== "PAYMENT_PENDING");
-    buySection.classList.toggle("hidden", STATE === "ACTIVE" || STATE === "PAYMENT_PENDING");
-
     if (STATE === "ACTIVE") {
-      document.getElementById("status-value").textContent = "Активна";
-      document.getElementById("status-value").className = "info-card__value status_active";
-      document.getElementById("subscription-value").textContent = "01.05.2025 (MSK+3)";
-      document.getElementById("tariff-value").textContent = "3 месяца";
-      document.getElementById("days-value").textContent = "89";
+      statusText.textContent = "Активен до 01.05.2025";
+      statusText.className = "status-text active";
+      hasKeyBlock.classList.remove("hidden");
+      buySection.classList.add("hidden");
       document.getElementById("key-input").value = "vless://uuid@example.com:443?encryption=none";
-      document.getElementById("key-status").textContent = "Активен";
-      document.getElementById("key-status").className = "key-status active";
     } else if (STATE === "EXPIRED") {
-      document.getElementById("status-value").textContent = "Истекла";
-      document.getElementById("status-value").className = "info-card__value status_expired";
-      document.getElementById("subscription-value").textContent = "15.01.2025 (MSK+3)";
-      document.getElementById("tariff-value").textContent = "3 месяца";
-      document.getElementById("days-value").textContent = "0";
-    }
-
-    if (STATE === "NO_SUBSCRIPTION" || STATE === "EXPIRED") {
-      btnBuyKey.textContent = STATE === "EXPIRED" ? "Продлить подписку" : "Купить ключ";
+      statusText.textContent = "Ключ истёк";
+      statusText.className = "status-text";
+      hasKeyBlock.classList.add("hidden");
+      buySection.classList.remove("hidden");
+      btnBuyKey.textContent = "Продлить подписку";
+    } else if (STATE === "PAYMENT_PENDING") {
+      statusText.textContent = "Оплата в процессе...";
+      statusText.className = "status-text";
+      hasKeyBlock.classList.add("hidden");
+      buySection.classList.add("hidden");
+    } else {
+      statusText.textContent = "Ключ не активен";
+      statusText.className = "status-text";
+      hasKeyBlock.classList.add("hidden");
+      buySection.classList.remove("hidden");
+      btnBuyKey.textContent = "Купить ключ";
     }
   }
 
@@ -112,9 +106,4 @@
     }
   });
 
-  // Показать QR (заглушка)
-  document.getElementById("btn-qr").addEventListener("click", function () {
-    tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
-    tg.showAlert && tg.showAlert("QR-код будет доступен при поддержке клиентом.");
-  });
 })();

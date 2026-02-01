@@ -14,51 +14,18 @@
     </header>
 
     <main class="content">
-      <!-- 1. Информация о подписке -->
-      <section class="subscription-info" id="subscription-section">
-        <div class="subscription-info_no-sub" id="no-sub-block">
-          <p class="subscription-info__text">Ключ не активен</p>
-        </div>
-        <div class="subscription-info_has-sub hidden" id="has-sub-block">
-          <div class="info-grid">
-            <div class="info-card">
-              <span class="info-card__label">Статус</span>
-              <span class="info-card__value" id="status-value">—</span>
-            </div>
-            <div class="info-card">
-              <span class="info-card__label">Подписка до</span>
-              <span class="info-card__value" id="subscription-value">—</span>
-            </div>
-            <div class="info-card">
-              <span class="info-card__label">Тариф</span>
-              <span class="info-card__value" id="tariff-value">—</span>
-            </div>
-            <div class="info-card">
-              <span class="info-card__label">Осталось дней</span>
-              <span class="info-card__value" id="days-value">—</span>
-            </div>
-          </div>
-        </div>
+      <!-- 1. Статус сверху -->
+      <section class="status-section">
+        <p class="status-text" id="status-text">Ключ не активен</p>
       </section>
 
       <!-- 2. Ключ / доступ -->
       <section class="key-section">
-        <div class="key-section_no-key hidden" id="no-key-block">
-        </div>
         <div class="key-section_has-key hidden" id="has-key-block">
-          <p class="key-section__label">Ключ уже выдан</p>
-          <div class="key-field">
-            <input type="text" class="key-field__input" id="key-input" readonly value="">
+          <div class="key-row">
+            <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ">
+            <button type="button" class="btn btn_secondary btn_copy" id="btn-copy">Скопировать ключ</button>
           </div>
-          <div class="key-actions">
-            <button type="button" class="btn btn_secondary btn_small" id="btn-copy">Скопировать</button>
-            <button type="button" class="btn btn_secondary btn_small" id="btn-qr">Показать QR</button>
-          </div>
-          <span class="key-status" id="key-status">Активен</span>
-        </div>
-        <div class="key-section_loading hidden" id="payment-loading-block">
-          <div class="loader"></div>
-          <p>Оплата в процессе...</p>
         </div>
       </section>
 
@@ -68,14 +35,18 @@
         <p class="tariffs__note">Один ключ · Одно устройство</p>
         <div class="tariff-options">
           <button type="button" class="tariff-card tariff-card_selected" data-months="1" data-price="100" id="tariff-1">
-            <span class="tariff-card__period">1 месяц</span>
-            <span class="tariff-card__price">100 ₽</span>
+            <div class="tariff-card__content">
+              <span class="tariff-card__period">1 месяц</span>
+              <span class="tariff-card__price">100 ₽</span>
+            </div>
           </button>
           <button type="button" class="tariff-card tariff-card_recommended" data-months="3" data-price="250" id="tariff-3">
             <span class="tariff-card__badge">Рекомендуем</span>
-            <span class="tariff-card__period">3 месяца</span>
-            <span class="tariff-card__price">250 ₽</span>
-            <span class="tariff-card__savings">Экономия 50 ₽</span>
+            <div class="tariff-card__content">
+              <span class="tariff-card__period">3 месяца</span>
+              <span class="tariff-card__price">250 ₽</span>
+              <span class="tariff-card__savings">Экономия 50 ₽</span>
+            </div>
           </button>
         </div>
         <div class="buy-section" id="buy-section">
