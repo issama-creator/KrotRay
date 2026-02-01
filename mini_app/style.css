@@ -149,12 +149,12 @@ body {
 }
 
 .tariff-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: #22c55e;
 }
 
 .tariff-card_selected {
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
 }
 
 .tariff-card__content {
