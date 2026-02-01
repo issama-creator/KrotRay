@@ -64,8 +64,8 @@ sudo -u postgres psql
 В консоли PostgreSQL выполни:
 
 ```sql
-CREATE USER krotray WITH PASSWORD 'придумай_пароль';
-CREATE DATABASE krotray OWNER krotray;
+CREATE USER krot WITH PASSWORD 'assaasin06';
+CREATE DATABASE krotray OWNER krot;
 \q
 ```
 
