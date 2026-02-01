@@ -61,10 +61,10 @@
 
   // Выбор тарифа
   function setSelected(card) {
-    document.querySelectorAll(".tariff-card").forEach(function (c) {
-      c.classList.remove("tariff-card_selected");
+    document.querySelectorAll(".tariff-row").forEach(function (c) {
+      c.classList.remove("tariff-row_selected");
     });
-    card.classList.add("tariff-card_selected");
+    card.classList.add("tariff-row_selected");
     selectedTariff.months = parseInt(card.dataset.months, 10);
     selectedTariff.price = parseInt(card.dataset.price, 10);
   }
