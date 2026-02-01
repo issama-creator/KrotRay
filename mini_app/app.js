@@ -1,29 +1,39 @@
 (function () {
   var tg = window.Telegram && window.Telegram.WebApp;
-  if (!tg) return;
-
-  tg.ready();
-  tg.expand();
+  if (!tg) {
+    tg = { initData: "", HapticFeedback: null, showAlert: function (m) { alert(m); } };
+  } else {
+    tg.ready();
+    tg.expand();
+  }
 
   if (tg.themeParams && tg.themeParams.bg_color) {
     tg.setHeaderColor(tg.themeParams.bg_color);
     tg.setBackgroundColor(tg.themeParams.bg_color);
   }
 
-  // Состояния: NO_SUBSCRIPTION | ACTIVE | EXPIRED | PAYMENT_PENDING
-  // Mock: по умолчанию нет подписки. Для превью добавить ?state=active в URL
   var params = new URLSearchParams(window.location.search);
-  var stateParam = params.get("state");
-  var STATE =
-    stateParam === "active"
-      ? "ACTIVE"
-      : stateParam === "expired"
-      ? "EXPIRED"
-      : stateParam === "payment"
-      ? "PAYMENT_PENDING"
-      : "NO_SUBSCRIPTION";
+  var apiBase = params.get("api") || "http://localhost:8000";
+  apiBase = apiBase.replace(/\/$/, "");
+
+  var STATE = "NO_SUBSCRIPTION";
+  var data = { subscription: null };
 
   var selectedTariff = { months: 1, price: 100 };
+
+  function formatDate(isoStr) {
+    if (!isoStr) return "";
+    try {
+      var d = new Date(isoStr);
+      return d.toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch (e) {
+      return isoStr;
+    }
+  }
 
   function render() {
     var statusText = document.getElementById("status-text");
@@ -31,12 +41,31 @@
     var buySection = document.getElementById("buy-section");
     var btnBuyKey = document.getElementById("btn-buy-key");
 
+    if (STATE === "loading") {
+      statusText.textContent = "Загрузка...";
+      statusText.className = "status-text";
+      hasKeyBlock.classList.add("hidden");
+      buySection.classList.add("hidden");
+      return;
+    }
+
+    if (STATE === "error") {
+      statusText.textContent = "Ошибка загрузки";
+      statusText.className = "status-text";
+      hasKeyBlock.classList.add("hidden");
+      buySection.classList.remove("hidden");
+      btnBuyKey.textContent = "Купить ключ";
+      return;
+    }
+
     if (STATE === "ACTIVE") {
-      statusText.textContent = "Активен до 01.05.2025";
+      var sub = data.subscription;
+      statusText.textContent = "Активен до " + formatDate(sub.expires_at);
       statusText.className = "status-text active";
       hasKeyBlock.classList.remove("hidden");
       buySection.classList.add("hidden");
-      document.getElementById("key-input").value = "vless://uuid@example.com:443?encryption=none";
+      var key = sub.key || "";
+      document.getElementById("key-input").value = key || "Ключ будет доступен после настройки сервера";
     } else if (STATE === "EXPIRED") {
       statusText.textContent = "Ключ истёк";
       statusText.className = "status-text";
@@ -57,53 +86,96 @@
     }
   }
 
-  render();
+  function fetchProfile() {
+    var initData = tg.initData;
+    if (!initData) {
+      STATE = "NO_SUBSCRIPTION";
+      render();
+      bindEvents();
+      return;
+    }
 
-  // Выбор тарифа
-  function setSelected(card) {
-    document.querySelectorAll(".tariff-row").forEach(function (c) {
-      c.classList.remove("tariff-row_selected");
-    });
-    card.classList.add("tariff-row_selected");
-    selectedTariff.months = parseInt(card.dataset.months, 10);
-    selectedTariff.price = parseInt(card.dataset.price, 10);
+    STATE = "loading";
+    render();
+
+    fetch(apiBase + "/api/me", {
+      method: "GET",
+      headers: {
+        "X-Telegram-Init-Data": initData,
+      },
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("API error " + res.status);
+        return res.json();
+      })
+      .then(function (json) {
+        data = json;
+        STATE = json.state === "active" ? "ACTIVE" : json.state === "expired" ? "EXPIRED" : json.state === "payment_pending" ? "PAYMENT_PENDING" : "NO_SUBSCRIPTION";
+        render();
+        bindEvents();
+      })
+      .catch(function () {
+        STATE = "error";
+        render();
+        bindEvents();
+      });
   }
 
-  document.getElementById("tariff-1").addEventListener("click", function () {
-    tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-    setSelected(this);
-  });
+  function bindEvents() {
+    var tariff1 = document.getElementById("tariff-1");
+    var tariff3 = document.getElementById("tariff-3");
+    var btnBuyKey = document.getElementById("btn-buy-key");
+    var btnCopy = document.getElementById("btn-copy");
 
-  document.getElementById("tariff-3").addEventListener("click", function () {
-    tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-    setSelected(this);
-  });
+    if (!tariff1 || !tariff3) return;
 
-  // Купить ключ — переход на оплату (реальная оплата в Итерации 5)
-  document.getElementById("btn-buy-key").addEventListener("click", function () {
-    tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
-    tg.showAlert &&
-      tg.showAlert(
-        "Тариф: " +
-          selectedTariff.months +
-          " мес, " +
-          selectedTariff.price +
-          " ₽. Оплата через ЮKassa будет подключена в Итерации 5."
-      );
-  });
-
-  // Скопировать ключ
-  document.getElementById("btn-copy").addEventListener("click", function () {
-    tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
-    var input = document.getElementById("key-input");
-    input.select();
-    input.setSelectionRange(0, 99999);
-    try {
-      navigator.clipboard.writeText(input.value);
-      tg.showAlert && tg.showAlert("Ключ скопирован");
-    } catch (e) {
-      tg.showAlert && tg.showAlert("Скопируйте ключ вручную");
+    function setSelected(card) {
+      document.querySelectorAll(".tariff-row").forEach(function (c) {
+        c.classList.remove("tariff-row_selected");
+      });
+      card.classList.add("tariff-row_selected");
+      selectedTariff.months = parseInt(card.dataset.months, 10);
+      selectedTariff.price = parseInt(card.dataset.price, 10);
     }
-  });
 
+    tariff1.onclick = function () {
+      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+      setSelected(this);
+    };
+    tariff3.onclick = function () {
+      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+      setSelected(this);
+    };
+
+    if (btnBuyKey) {
+      btnBuyKey.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+        tg.showAlert &&
+          tg.showAlert(
+            "Тариф: " +
+              selectedTariff.months +
+              " мес, " +
+              selectedTariff.price +
+              " ₽. Оплата через ЮKassa будет подключена в Итерации 5."
+          );
+      };
+    }
+
+    if (btnCopy) {
+      btnCopy.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+        var input = document.getElementById("key-input");
+        input.select();
+        input.setSelectionRange(0, 99999);
+        try {
+          navigator.clipboard.writeText(input.value);
+          tg.showAlert && tg.showAlert("Ключ скопирован");
+        } catch (e) {
+          tg.showAlert && tg.showAlert("Скопируйте ключ вручную");
+        }
+      };
+    }
+  }
+
+  fetchProfile();
 })();

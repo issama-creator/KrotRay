@@ -1,0 +1,17 @@
+[project]
+name = "krotray"
+version = "0.1.0"
+description = "KrotRay VPN Bot"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.4.0",
+    "python-dotenv>=1.0.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "psycopg2-binary>=2.9.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+]
+
+[project.scripts]
+app = "api.main:app"
