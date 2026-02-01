@@ -10,14 +10,9 @@
     tg.setBackgroundColor(tg.themeParams.bg_color);
   }
 
-  var initData = tg.initData || "";
-  var hasInitData = initData.length > 0;
-
-  var mockStatus = hasInitData ? "Активен" : "Нет данных";
-  var mockSubscription = hasInitData ? "01.04.2025" : "—";
-
-  document.getElementById("status-value").textContent = mockStatus;
-  document.getElementById("subscription-value").textContent = mockSubscription;
+  // Статус и подписка — заглушки. Реальные данные будут в Итерации 4 (Mini App ↔ Backend).
+  document.getElementById("status-value").textContent = "—";
+  document.getElementById("subscription-value").textContent = "—";
 
   // Выбор тарифа: 1 мес 100₽, 3 мес 300₽
   var selectedTariff = { months: 3, price: 250 };
