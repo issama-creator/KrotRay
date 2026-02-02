@@ -35,18 +35,36 @@
     }
   }
 
+  function daysLeft(expiresAt) {
+    if (!expiresAt) return 0;
+    var end = new Date(expiresAt);
+    var now = new Date();
+    var diff = end - now;
+    return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+  }
+
+  function pluralDays(n) {
+    if (n === 1) return "день";
+    if (n >= 2 && n <= 4) return "дня";
+    return "дней";
+  }
+
+  function showScreen(name) {
+    var main = document.getElementById("screen-main");
+    var tariffs = document.getElementById("screen-tariffs");
+    if (main) main.classList.toggle("screen_hidden", name !== "main");
+    if (tariffs) tariffs.classList.toggle("screen_hidden", name !== "tariffs");
+  }
+
   function render() {
     var statusText = document.getElementById("status-text");
     var statusSubtitle = document.getElementById("status-subtitle");
     var statusPill = document.getElementById("status-pill");
     var statusPillText = document.getElementById("status-pill-text");
     var keyInput = document.getElementById("key-input");
-    var buySection = document.getElementById("buy-section");
-    var btnBuyKey = document.getElementById("btn-buy-key");
     var btnBuyKeyTopText = document.getElementById("btn-buy-key-top-text");
 
     function setBuyButtonLabel(label) {
-      if (btnBuyKey) btnBuyKey.textContent = label;
       if (btnBuyKeyTopText) btnBuyKeyTopText.textContent = label;
     }
 
@@ -56,7 +74,6 @@
       if (statusPillText) statusPillText.textContent = "Загрузка...";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
-      buySection.classList.add("hidden");
       return;
     }
 
@@ -66,19 +83,18 @@
       if (statusPillText) statusPillText.textContent = "Ошибка";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
-      buySection.classList.remove("hidden");
       setBuyButtonLabel("Купить ключ");
       return;
     }
 
     if (STATE === "ACTIVE") {
       var sub = data.subscription;
+      var left = daysLeft(sub.expires_at);
       if (statusText) { statusText.textContent = "Активен"; statusText.className = "balance-value active"; }
-      if (statusSubtitle) statusSubtitle.textContent = "до " + formatDate(sub.expires_at);
+      if (statusSubtitle) statusSubtitle.textContent = "Осталось " + left + " " + pluralDays(left);
       if (statusPillText) statusPillText.textContent = "Активен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
-      buySection.classList.add("hidden");
       setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "EXPIRED") {
       if (statusText) { statusText.textContent = "Просрочен"; statusText.className = "balance-value expired"; }
@@ -86,7 +102,6 @@
       if (statusPillText) statusPillText.textContent = "Просрочен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
       if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
-      buySection.classList.remove("hidden");
       setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "PAYMENT_PENDING") {
       if (statusText) { statusText.textContent = "Оплата в процессе..."; statusText.className = "balance-value pending"; }
@@ -94,7 +109,6 @@
       if (statusPillText) statusPillText.textContent = "Оплата...";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_pending";
       if (keyInput) keyInput.value = "";
-      buySection.classList.add("hidden");
       setBuyButtonLabel("Купить ключ");
     } else {
       if (statusText) { statusText.textContent = "Ключ не активен"; statusText.className = "balance-value"; }
@@ -102,7 +116,6 @@
       if (statusPillText) statusPillText.textContent = "Ключ не активен";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
-      buySection.classList.remove("hidden");
       setBuyButtonLabel("Купить ключ");
     }
   }
@@ -147,23 +160,10 @@
   function bindEvents() {
     var tariff1 = document.getElementById("tariff-1");
     var tariff3 = document.getElementById("tariff-3");
-    var btnBuyKey = document.getElementById("btn-buy-key");
     var btnBuyKeyTop = document.getElementById("btn-buy-key-top");
+    var btnTariffsBack = document.getElementById("btn-tariffs-back");
+    var btnPay = document.getElementById("btn-pay");
     var btnCopy = document.getElementById("btn-copy");
-
-    if (!tariff1 || !tariff3) return;
-
-    function onBuyKey() {
-      tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
-      tg.showAlert &&
-        tg.showAlert(
-          "Тариф: " +
-            selectedTariff.months +
-            " мес, " +
-            selectedTariff.price +
-            " ₽. Оплата через ЮKassa будет подключена в Итерации 5."
-        );
-    }
 
     function setSelected(card) {
       document.querySelectorAll(".tariff-row").forEach(function (c) {
@@ -174,17 +174,40 @@
       selectedTariff.price = parseInt(card.dataset.price, 10);
     }
 
-    tariff1.onclick = function () {
-      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-      setSelected(this);
-    };
-    tariff3.onclick = function () {
-      tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-      setSelected(this);
-    };
+    if (tariff1) {
+      tariff1.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+        setSelected(this);
+      };
+    }
+    if (tariff3) {
+      tariff3.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+        setSelected(this);
+      };
+    }
 
-    if (btnBuyKey) btnBuyKey.onclick = onBuyKey;
-    if (btnBuyKeyTop) btnBuyKeyTop.onclick = onBuyKey;
+    if (btnBuyKeyTop) {
+      btnBuyKeyTop.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+        showScreen("tariffs");
+      };
+    }
+    if (btnTariffsBack) {
+      btnTariffsBack.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
+        showScreen("main");
+      };
+    }
+    if (btnPay) {
+      btnPay.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+        tg.showAlert &&
+          tg.showAlert(
+            "Тариф: " + selectedTariff.months + " мес, " + selectedTariff.price + " ₽. Оплата через ЮKassa будет подключена в Итерации 5."
+          );
+      };
+    }
 
     if (btnCopy) {
       btnCopy.onclick = function () {

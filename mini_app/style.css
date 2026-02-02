@@ -52,6 +52,48 @@ body {
   padding-top: 24px;
 }
 
+/* Переключение экранов */
+.screen {
+  display: block;
+}
+
+.screen_hidden {
+  display: none !important;
+}
+
+/* Кнопка «Назад» на экране тарифов */
+.tariffs-back {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-link-color, #60a5fa);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tariffs-back:active {
+  opacity: 0.8;
+}
+
+/* Блок «Оплатить» на экране тарифов */
+.tariffs-pay {
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.tariffs-pay .btn_large {
+  margin-bottom: 12px;
+}
+
+.tariffs-pay .payment-note {
+  margin-top: 12px;
+}
+
 /* 1. Крупный статус + подзаголовок (как «Баланс» / «54 ₽») */
 .balance-section {
   margin-bottom: 24px;

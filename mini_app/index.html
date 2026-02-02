@@ -14,57 +14,57 @@
     </header>
 
     <main class="content">
-      <!-- 1. Крупный статус + подзаголовок (как «Баланс» / «54 ₽») -->
-      <section class="balance-section">
-        <p class="balance-value" id="status-text">Ключ не активен</p>
-        <p class="balance-subtitle" id="status-subtitle"></p>
-      </section>
-
-      <!-- 2. Ряд из двух: «Купить ключ» (+) и Статус (вместо «История») -->
-      <section class="action-row">
-        <button type="button" class="action-btn action-btn_primary" id="btn-buy-key-top">
-          <span class="action-btn__icon action-btn__icon_plus">+</span>
-          <span class="action-btn__text" id="btn-buy-key-top-text">Купить ключ</span>
-        </button>
-        <div class="action-btn action-btn_status" id="status-pill">
-          <span class="action-btn__text" id="status-pill-text">Ключ не активен</span>
-        </div>
-      </section>
-
-      <!-- 3. Участок: Ключ + кнопка «Скопировать» (как на твоём скрине) -->
-      <section class="key-section">
-        <label class="key-section__label">Ключ</label>
-        <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ появится после оплаты">
-        <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Скопировать</button>
-      </section>
-
-      <!-- Тарифы -->
-      <section class="tariffs">
-        <h2 class="section-title">Тарифы</h2>
-        <p class="tariffs__note">Один ключ · Одно устройство</p>
-        <div class="tariff-options">
-          <button type="button" class="tariff-row tariff-row_selected" data-months="1" data-price="100" id="tariff-1">
-            <span class="tariff-row__radio"></span>
-            <span class="tariff-row__period">1 месяц</span>
-            <span class="tariff-row__price">100 ₽</span>
+      <!-- Экран 1: Главная (Личный кабинет) -->
+      <div class="screen screen-main" id="screen-main">
+        <section class="balance-section">
+          <p class="balance-value" id="status-text">Ключ не активен</p>
+          <p class="balance-subtitle" id="status-subtitle"></p>
+        </section>
+        <section class="action-row">
+          <button type="button" class="action-btn action-btn_primary" id="btn-buy-key-top">
+            <span class="action-btn__icon action-btn__icon_plus">+</span>
+            <span class="action-btn__text" id="btn-buy-key-top-text">Купить ключ</span>
           </button>
-          <button type="button" class="tariff-row" data-months="3" data-price="250" id="tariff-3">
-            <span class="tariff-row__radio"></span>
-            <span class="tariff-row__period">3 месяца</span>
-            <span class="tariff-row__price">250 ₽</span>
-          </button>
-          <p class="tariff-savings">Экономия <span class="tariff-savings__amount">50 ₽</span></p>
-        </div>
-        <div class="buy-section" id="buy-section">
-          <button type="button" class="btn btn_primary btn_large" id="btn-buy-key">Купить ключ</button>
-          <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
-        </div>
-      </section>
+          <div class="action-btn action-btn_status" id="status-pill">
+            <span class="action-btn__text" id="status-pill-text">Ключ не активен</span>
+          </div>
+        </section>
+        <section class="key-section">
+          <label class="key-section__label">Ключ</label>
+          <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ появится после оплаты">
+          <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Скопировать</button>
+        </section>
+        <footer class="footer">
+          <p class="footer__support">Поддержка: <a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">@krotraybot</a></p>
+          <p class="footer__handle">@krotraybot</p>
+        </footer>
+      </div>
 
-      <footer class="footer">
-        <p class="footer__support">Поддержка: <a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">@krotraybot</a></p>
-        <p class="footer__handle">@krotraybot</p>
-      </footer>
+      <!-- Экран 2: Тарифы (по нажатию Купить/Продлить ключ) -->
+      <div class="screen screen-tariffs screen_hidden" id="screen-tariffs">
+        <button type="button" class="tariffs-back" id="btn-tariffs-back">← Назад</button>
+        <section class="tariffs">
+          <h2 class="section-title">Тарифы</h2>
+          <p class="tariffs__note">Один ключ · Одно устройство</p>
+          <div class="tariff-options">
+            <button type="button" class="tariff-row tariff-row_selected" data-months="1" data-price="100" id="tariff-1">
+              <span class="tariff-row__radio"></span>
+              <span class="tariff-row__period">1 месяц</span>
+              <span class="tariff-row__price">100 ₽</span>
+            </button>
+            <button type="button" class="tariff-row" data-months="3" data-price="250" id="tariff-3">
+              <span class="tariff-row__radio"></span>
+              <span class="tariff-row__period">3 месяца</span>
+              <span class="tariff-row__price">250 ₽</span>
+            </button>
+            <p class="tariff-savings">Экономия <span class="tariff-savings__amount">50 ₽</span></p>
+          </div>
+          <div class="tariffs-pay">
+            <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
+            <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 
