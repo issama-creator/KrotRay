@@ -52,46 +52,113 @@ body {
   padding-top: 24px;
 }
 
-/* 1. Статус (активен / не активен / просрочен) */
-.status-section {
-  margin-bottom: 20px;
+/* 1. Крупный статус + подзаголовок (как «Баланс» / «54 ₽») */
+.balance-section {
+  margin-bottom: 24px;
   text-align: center;
 }
 
-.status-text {
+.balance-value {
   margin: 0;
-  padding: 20px 24px;
-  background: var(--tg-theme-secondary-bg-color, #1c1c22);
-  border-radius: 16px;
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
-  font-size: 18px;
+  font-size: 28px;
   font-weight: 700;
-  color: var(--tg-theme-hint-color, #a1a1aa);
+  color: var(--tg-theme-text-color, #e4e4e7);
   letter-spacing: -0.02em;
 }
 
-.status-text.active {
+.balance-value.active {
   color: #22c55e;
-  border-color: rgba(34, 197, 94, 0.25);
 }
 
-.status-text.expired {
+.balance-value.expired {
   color: #f97316;
-  border-color: rgba(249, 115, 22, 0.25);
 }
 
-.status-text.pending {
+.balance-value.pending {
   color: #eab308;
-  border-color: rgba(234, 179, 8, 0.25);
 }
 
-.status-subtitle {
+.balance-subtitle {
   margin: 8px 0 0;
   font-size: 14px;
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-/* 2. Ключ + кнопка «Скопировать» — всегда виден */
+/* 2. Ряд из двух: «Купить ключ» (+) и Статус (вместо «История») */
+.action-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.action-btn:active:not(.action-btn_status) {
+  opacity: 0.9;
+  transform: scale(0.99);
+}
+
+.action-btn_primary {
+  background: linear-gradient(180deg, #4f8cff 0%, #2563eb 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.action-btn__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.action-btn__icon_plus {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.action-btn_status {
+  background: var(--tg-theme-secondary-bg-color, #1c1c22);
+  color: var(--tg-theme-hint-color, #a1a1aa);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.1));
+  cursor: default;
+}
+
+.action-btn_status.status_active {
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.action-btn_status.status_expired {
+  color: #f97316;
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.action-btn_status.status_pending {
+  color: #eab308;
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+/* 3. Участок: Ключ + кнопка «Скопировать» на всю ширину */
 .key-section {
   margin-bottom: 28px;
 }
@@ -106,21 +173,16 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-.key-row {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
+.key-section .key-field__input {
+  width: 100%;
+  margin-bottom: 12px;
 }
 
-.key-row .key-field__input {
-  flex: 1;
-  min-width: 0;
-}
-
-.key-row .btn_copy {
-  flex-shrink: 0;
-  white-space: nowrap;
-  min-width: 120px;
+.btn_copy_full {
+  width: 100%;
+  min-height: 48px;
+  padding: 14px 20px;
+  border-radius: 12px;
 }
 
 .payment-note {

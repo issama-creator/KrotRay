@@ -14,19 +14,28 @@
     </header>
 
     <main class="content">
-      <!-- 1. Статус (активен / не активен / просрочен и т.д.) -->
-      <section class="status-section">
-        <p class="status-text" id="status-text">Ключ не активен</p>
-        <p class="status-subtitle" id="status-subtitle"></p>
+      <!-- 1. Крупный статус + подзаголовок (как «Баланс» / «54 ₽») -->
+      <section class="balance-section">
+        <p class="balance-value" id="status-text">Ключ не активен</p>
+        <p class="balance-subtitle" id="status-subtitle"></p>
       </section>
 
-      <!-- 2. Ключ + кнопка «Скопировать» — всегда виден -->
+      <!-- 2. Ряд из двух: «Купить ключ» (+) и Статус (вместо «История») -->
+      <section class="action-row">
+        <button type="button" class="action-btn action-btn_primary" id="btn-buy-key-top">
+          <span class="action-btn__icon action-btn__icon_plus">+</span>
+          <span class="action-btn__text" id="btn-buy-key-top-text">Купить ключ</span>
+        </button>
+        <div class="action-btn action-btn_status" id="status-pill">
+          <span class="action-btn__text" id="status-pill-text">Ключ не активен</span>
+        </div>
+      </section>
+
+      <!-- 3. Участок: Ключ + кнопка «Скопировать» (как на твоём скрине) -->
       <section class="key-section">
         <label class="key-section__label">Ключ</label>
-        <div class="key-row">
-          <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ появится после оплаты">
-          <button type="button" class="btn btn_secondary btn_copy" id="btn-copy">Скопировать</button>
-        </div>
+        <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ появится после оплаты">
+        <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Скопировать</button>
       </section>
 
       <!-- Тарифы -->

@@ -38,56 +38,72 @@
   function render() {
     var statusText = document.getElementById("status-text");
     var statusSubtitle = document.getElementById("status-subtitle");
+    var statusPill = document.getElementById("status-pill");
+    var statusPillText = document.getElementById("status-pill-text");
     var keyInput = document.getElementById("key-input");
     var buySection = document.getElementById("buy-section");
     var btnBuyKey = document.getElementById("btn-buy-key");
+    var btnBuyKeyTopText = document.getElementById("btn-buy-key-top-text");
+
+    function setBuyButtonLabel(label) {
+      if (btnBuyKey) btnBuyKey.textContent = label;
+      if (btnBuyKeyTopText) btnBuyKeyTopText.textContent = label;
+    }
 
     if (STATE === "loading") {
-      statusText.textContent = "Загрузка...";
-      statusText.className = "status-text";
+      if (statusText) { statusText.textContent = "Загрузка..."; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
+      if (statusPillText) statusPillText.textContent = "Загрузка...";
+      if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
       buySection.classList.add("hidden");
       return;
     }
 
     if (STATE === "error") {
-      statusText.textContent = "Ошибка загрузки";
-      statusText.className = "status-text";
+      if (statusText) { statusText.textContent = "Ошибка загрузки"; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
+      if (statusPillText) statusPillText.textContent = "Ошибка";
+      if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
       buySection.classList.remove("hidden");
-      if (btnBuyKey) btnBuyKey.textContent = "Купить ключ";
+      setBuyButtonLabel("Купить ключ");
       return;
     }
 
     if (STATE === "ACTIVE") {
       var sub = data.subscription;
-      statusText.textContent = "Активен";
-      statusText.className = "status-text active";
+      if (statusText) { statusText.textContent = "Активен"; statusText.className = "balance-value active"; }
       if (statusSubtitle) statusSubtitle.textContent = "до " + formatDate(sub.expires_at);
+      if (statusPillText) statusPillText.textContent = "Активен";
+      if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
       buySection.classList.add("hidden");
+      setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "EXPIRED") {
-      statusText.textContent = "Просрочен";
-      statusText.className = "status-text expired";
+      if (statusText) { statusText.textContent = "Просрочен"; statusText.className = "balance-value expired"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
+      if (statusPillText) statusPillText.textContent = "Просрочен";
+      if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
       if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
       buySection.classList.remove("hidden");
-      if (btnBuyKey) btnBuyKey.textContent = "Продлить подписку";
+      setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "PAYMENT_PENDING") {
-      statusText.textContent = "Оплата в процессе...";
-      statusText.className = "status-text pending";
+      if (statusText) { statusText.textContent = "Оплата в процессе..."; statusText.className = "balance-value pending"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
+      if (statusPillText) statusPillText.textContent = "Оплата...";
+      if (statusPill) statusPill.className = "action-btn action-btn_status status_pending";
       if (keyInput) keyInput.value = "";
       buySection.classList.add("hidden");
+      setBuyButtonLabel("Купить ключ");
     } else {
-      statusText.textContent = "Ключ не активен";
-      statusText.className = "status-text";
+      if (statusText) { statusText.textContent = "Ключ не активен"; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
+      if (statusPillText) statusPillText.textContent = "Ключ не активен";
+      if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
       buySection.classList.remove("hidden");
-      if (btnBuyKey) btnBuyKey.textContent = "Купить ключ";
+      setBuyButtonLabel("Купить ключ");
     }
   }
 
@@ -132,9 +148,22 @@
     var tariff1 = document.getElementById("tariff-1");
     var tariff3 = document.getElementById("tariff-3");
     var btnBuyKey = document.getElementById("btn-buy-key");
+    var btnBuyKeyTop = document.getElementById("btn-buy-key-top");
     var btnCopy = document.getElementById("btn-copy");
 
     if (!tariff1 || !tariff3) return;
+
+    function onBuyKey() {
+      tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+      tg.showAlert &&
+        tg.showAlert(
+          "Тариф: " +
+            selectedTariff.months +
+            " мес, " +
+            selectedTariff.price +
+            " ₽. Оплата через ЮKassa будет подключена в Итерации 5."
+        );
+    }
 
     function setSelected(card) {
       document.querySelectorAll(".tariff-row").forEach(function (c) {
@@ -154,19 +183,8 @@
       setSelected(this);
     };
 
-    if (btnBuyKey) {
-      btnBuyKey.onclick = function () {
-        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
-        tg.showAlert &&
-          tg.showAlert(
-            "Тариф: " +
-              selectedTariff.months +
-              " мес, " +
-              selectedTariff.price +
-              " ₽. Оплата через ЮKassa будет подключена в Итерации 5."
-          );
-      };
-    }
+    if (btnBuyKey) btnBuyKey.onclick = onBuyKey;
+    if (btnBuyKeyTop) btnBuyKeyTop.onclick = onBuyKey;
 
     if (btnCopy) {
       btnCopy.onclick = function () {
