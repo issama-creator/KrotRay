@@ -413,3 +413,26 @@ systemctl restart krotray
 3. На сервере проверь пользователей:  
    `sudo -u postgres psql -d krotray -c "SELECT * FROM users;"`  
    После захода в Mini App должны появиться строки.
+
+---
+
+## Если /api/me возвращает 401 и users пустая
+
+1. **Обнови код на сервере** (важен фикс проверки initData в `api/auth.py`):
+   ```bash
+   cd /opt/krotray && git pull
+   ```
+   Если деплой не через git — открой `nano /opt/krotray/api/auth.py` и проверь блок `secret_key = hmac.new(...)`: первый аргумент должен быть `b"WebAppData"`, второй — `BOT_TOKEN.encode()` (по документации Telegram: ключ = WebAppData, сообщение = токен).
+
+2. **Перезапусти и смотри логи:**
+   ```bash
+   systemctl restart krotray
+   journalctl -u krotray -f
+   ```
+   В Telegram открой бота → «Личный кабинет». В логах появится одна из причин 401:
+   - `initData отсутствует` — заголовок X-Telegram-Init-Data не доходит (Nginx/прокси).
+   - `Неверный initData` — неверная подпись (проверь BOT_TOKEN в .env и фикс HMAC в auth.py) или устаревший auth_date (>24 ч).
+   - `BOT_TOKEN не задан` — .env не загружен (запуск из /opt/krotray, в unit есть WorkingDirectory=/opt/krotray).
+
+3. **Проверь .env на сервере:**  
+   `grep -E "BOT_TOKEN|API_URL|DATABASE_URL" /opt/krotray/.env` — BOT_TOKEN не пустой, API_URL=https://krotray.ru, DATABASE_URL=postgresql://...

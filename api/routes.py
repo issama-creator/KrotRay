@@ -1,4 +1,5 @@
 """API маршруты для Mini App."""
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -9,6 +10,7 @@ from api.auth import get_or_create_user, verify_init_data
 from db.models import Payment, Subscription, User
 from db.session import get_session
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["mini-app"])
 
 
@@ -21,20 +23,24 @@ def get_db():
 
 
 def get_current_user(
-    x_telegram_init_data: str = Header(None),
+    x_telegram_init_data: str | None = Header(None, alias="X-Telegram-Init-Data"),
     db: Session = Depends(get_db),
 ) -> User:
     """Извлекает пользователя по initData."""
     if not x_telegram_init_data:
+        logger.warning("/api/me: 401 initData отсутствует (заголовок не передан)")
         raise HTTPException(status_code=401, detail="initData отсутствует")
     data = verify_init_data(x_telegram_init_data)
     if not data:
+        logger.warning("/api/me: 401 Неверный initData (подпись или auth_date)")
         raise HTTPException(status_code=401, detail="Неверный initData")
     user_data = data.get("user")
     if not user_data:
+        logger.warning("/api/me: 401 Нет данных пользователя в initData")
         raise HTTPException(status_code=401, detail="Нет данных пользователя")
     telegram_id = user_data.get("id")
     if not telegram_id:
+        logger.warning("/api/me: 401 Нет telegram_id в user")
         raise HTTPException(status_code=401, detail="Нет telegram_id")
     user = get_or_create_user(
         db,
@@ -42,6 +48,7 @@ def get_current_user(
         username=user_data.get("username"),
         first_name=user_data.get("first_name"),
     )
+    logger.info("/api/me: user id=%s telegram_id=%s", user.id, user.telegram_id)
     return user
 
 

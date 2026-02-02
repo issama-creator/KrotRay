@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import logging
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -11,6 +12,8 @@ from sqlalchemy.orm import Session
 from bot.config import BOT_TOKEN
 from db.models import User
 
+logger = logging.getLogger(__name__)
+
 
 def verify_init_data(init_data: str) -> dict[str, Any] | None:
     """
@@ -18,6 +21,8 @@ def verify_init_data(init_data: str) -> dict[str, Any] | None:
     Возвращает распарсенные данные или None при ошибке.
     """
     if not init_data or not BOT_TOKEN:
+        if not BOT_TOKEN:
+            logger.warning("verify_init_data: BOT_TOKEN не задан (проверь .env)")
         return None
 
     try:

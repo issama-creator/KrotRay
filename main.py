@@ -1,6 +1,9 @@
 import asyncio
+import logging
 
 import uvicorn
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(name)s: %(message)s")
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
