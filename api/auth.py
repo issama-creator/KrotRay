@@ -29,9 +29,10 @@ def verify_init_data(init_data: str) -> dict[str, Any] | None:
         data_check_string = "\n".join(
             f"{k}={v}" for k, v in sorted(parsed.items())
         )
+        # По документации Telegram: HMAC-SHA256(key=WebAppData, message=token)
         secret_key = hmac.new(
-            BOT_TOKEN.encode(),
             b"WebAppData",
+            BOT_TOKEN.encode(),
             hashlib.sha256,
         ).digest()
         calculated_hash = hmac.new(
