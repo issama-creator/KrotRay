@@ -87,13 +87,7 @@
   }
 
   function fetchProfile() {
-    var initData = tg.initData;
-    if (!initData) {
-      STATE = "NO_SUBSCRIPTION";
-      render();
-      bindEvents();
-      return;
-    }
+    var initData = tg.initData || "";
 
     STATE = "loading";
     render();
@@ -105,10 +99,18 @@
       },
     })
       .then(function (res) {
+        if (res.status === 401) {
+          STATE = "NO_SUBSCRIPTION";
+          data = { subscription: null };
+          render();
+          bindEvents();
+          return;
+        }
         if (!res.ok) throw new Error("API error " + res.status);
         return res.json();
       })
       .then(function (json) {
+        if (!json) return;
         data = json;
         STATE = json.state === "active" ? "ACTIVE" : json.state === "expired" ? "EXPIRED" : json.state === "payment_pending" ? "PAYMENT_PENDING" : "NO_SUBSCRIPTION";
         render();
