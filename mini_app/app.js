@@ -37,14 +37,16 @@
 
   function render() {
     var statusText = document.getElementById("status-text");
-    var hasKeyBlock = document.getElementById("has-key-block");
+    var statusSubtitle = document.getElementById("status-subtitle");
+    var keyInput = document.getElementById("key-input");
     var buySection = document.getElementById("buy-section");
     var btnBuyKey = document.getElementById("btn-buy-key");
 
     if (STATE === "loading") {
       statusText.textContent = "Загрузка...";
       statusText.className = "status-text";
-      hasKeyBlock.classList.add("hidden");
+      if (statusSubtitle) statusSubtitle.textContent = "";
+      if (keyInput) keyInput.value = "";
       buySection.classList.add("hidden");
       return;
     }
@@ -52,37 +54,40 @@
     if (STATE === "error") {
       statusText.textContent = "Ошибка загрузки";
       statusText.className = "status-text";
-      hasKeyBlock.classList.add("hidden");
+      if (statusSubtitle) statusSubtitle.textContent = "";
+      if (keyInput) keyInput.value = "";
       buySection.classList.remove("hidden");
-      btnBuyKey.textContent = "Купить ключ";
+      if (btnBuyKey) btnBuyKey.textContent = "Купить ключ";
       return;
     }
 
     if (STATE === "ACTIVE") {
       var sub = data.subscription;
-      statusText.textContent = "Активен до " + formatDate(sub.expires_at);
+      statusText.textContent = "Активен";
       statusText.className = "status-text active";
-      hasKeyBlock.classList.remove("hidden");
+      if (statusSubtitle) statusSubtitle.textContent = "до " + formatDate(sub.expires_at);
+      if (keyInput) keyInput.value = sub.key || "";
       buySection.classList.add("hidden");
-      var key = sub.key || "";
-      document.getElementById("key-input").value = key || "Ключ будет доступен после настройки сервера";
     } else if (STATE === "EXPIRED") {
-      statusText.textContent = "Ключ истёк";
-      statusText.className = "status-text";
-      hasKeyBlock.classList.add("hidden");
+      statusText.textContent = "Просрочен";
+      statusText.className = "status-text expired";
+      if (statusSubtitle) statusSubtitle.textContent = "";
+      if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
       buySection.classList.remove("hidden");
-      btnBuyKey.textContent = "Продлить подписку";
+      if (btnBuyKey) btnBuyKey.textContent = "Продлить подписку";
     } else if (STATE === "PAYMENT_PENDING") {
       statusText.textContent = "Оплата в процессе...";
-      statusText.className = "status-text";
-      hasKeyBlock.classList.add("hidden");
+      statusText.className = "status-text pending";
+      if (statusSubtitle) statusSubtitle.textContent = "";
+      if (keyInput) keyInput.value = "";
       buySection.classList.add("hidden");
     } else {
       statusText.textContent = "Ключ не активен";
       statusText.className = "status-text";
-      hasKeyBlock.classList.add("hidden");
+      if (statusSubtitle) statusSubtitle.textContent = "";
+      if (keyInput) keyInput.value = "";
       buySection.classList.remove("hidden");
-      btnBuyKey.textContent = "Купить ключ";
+      if (btnBuyKey) btnBuyKey.textContent = "Купить ключ";
     }
   }
 
@@ -165,8 +170,12 @@
 
     if (btnCopy) {
       btnCopy.onclick = function () {
-        tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
         var input = document.getElementById("key-input");
+        if (!input || !input.value.trim()) {
+          tg.showAlert && tg.showAlert("Сначала приобретите ключ");
+          return;
+        }
+        tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
         input.select();
         input.setSelectionRange(0, 99999);
         try {
