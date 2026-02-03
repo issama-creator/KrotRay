@@ -60,6 +60,18 @@
             <p class="tariff-savings">Экономия <span class="tariff-savings__amount">50 ₽</span></p>
           </div>
           <div class="tariffs-pay">
+            <p class="tariffs-pay__amount" id="pay-amount">100 ₽</p>
+            <div class="payment-method">
+              <span class="payment-method__label">Способ оплаты</span>
+              <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="method-sbp">
+                <span class="payment-method__radio"></span>
+                <span class="payment-method__text">СБП</span>
+              </button>
+              <button type="button" class="payment-method__row" data-method="card" id="method-card">
+                <span class="payment-method__radio"></span>
+                <span class="payment-method__text">Оплата картой</span>
+              </button>
+            </div>
             <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
             <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
           </div>

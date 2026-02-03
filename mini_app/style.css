@@ -86,6 +86,66 @@ body {
   margin-bottom: 16px;
 }
 
+.tariffs-pay__amount {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color, #e4e4e7);
+}
+
+.payment-method {
+  margin-bottom: 20px;
+}
+
+.payment-method__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
+.payment-method__row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  gap: 12px;
+}
+
+.payment-method__row:active {
+  opacity: 0.9;
+}
+
+.payment-method__radio {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--tg-theme-hint-color, #94a3b8);
+  border-radius: 50%;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.payment-method__row_selected .payment-method__radio {
+  border-color: #22c55e;
+  background: #22c55e;
+  box-shadow: inset 0 0 0 3px var(--tg-theme-bg-color, #0f0f14);
+}
+
+.payment-method__text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #e4e4e7);
+}
+
 .tariffs-pay .btn_large {
   margin-bottom: 12px;
 }

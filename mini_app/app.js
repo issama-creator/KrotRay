@@ -20,6 +20,7 @@
   var data = { subscription: null };
 
   var selectedTariff = { months: 1, price: 100 };
+  var selectedPaymentMethod = "sbp"; // "sbp" | "card"
 
   function formatDate(isoStr) {
     if (!isoStr) return "";
@@ -172,6 +173,15 @@
       card.classList.add("tariff-row_selected");
       selectedTariff.months = parseInt(card.dataset.months, 10);
       selectedTariff.price = parseInt(card.dataset.price, 10);
+      var payAmount = document.getElementById("pay-amount");
+      if (payAmount) payAmount.textContent = selectedTariff.price + " ₽";
+    }
+
+    function setPaymentMethod(method) {
+      selectedPaymentMethod = method;
+      document.querySelectorAll(".payment-method__row").forEach(function (r) {
+        r.classList.toggle("payment-method__row_selected", r.dataset.method === method);
+      });
     }
 
     if (tariff1) {
@@ -199,13 +209,57 @@
         showScreen("main");
       };
     }
+    var methodSbp = document.getElementById("method-sbp");
+    var methodCard = document.getElementById("method-card");
+    if (methodSbp) {
+      methodSbp.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+        setPaymentMethod("sbp");
+      };
+    }
+    if (methodCard) {
+      methodCard.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+        setPaymentMethod("card");
+      };
+    }
+
     if (btnPay) {
       btnPay.onclick = function () {
         tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
-        tg.showAlert &&
-          tg.showAlert(
-            "Тариф: " + selectedTariff.months + " мес, " + selectedTariff.price + " ₽. Оплата через ЮKassa будет подключена в Итерации 5."
-          );
+        var tariffId = selectedTariff.months === 1 ? "1m" : "3m";
+        var initData = tg.initData || "";
+        btnPay.disabled = true;
+        fetch(apiBase + "/api/payments/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": initData,
+          },
+          body: JSON.stringify({ tariff: tariffId, method: selectedPaymentMethod }),
+        })
+          .then(function (res) {
+            return res.json().then(function (json) {
+              if (!res.ok) throw new Error(json.detail || "Ошибка создания платежа");
+              return json;
+            });
+          })
+          .then(function (json) {
+            var url = json.confirmation_url;
+            if (url && tg.openLink) {
+              tg.openLink(url);
+            } else if (url) {
+              window.open(url, "_blank");
+            } else {
+              tg.showAlert && tg.showAlert("Не получена ссылка на оплату");
+            }
+          })
+          .catch(function (err) {
+            tg.showAlert && tg.showAlert(err.message || "Ошибка. Попробуйте позже.");
+          })
+          .finally(function () {
+            btnPay.disabled = false;
+          });
       };
     }
 
