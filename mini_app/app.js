@@ -240,7 +240,14 @@
         })
           .then(function (res) {
             return res.json().then(function (json) {
-              if (!res.ok) throw new Error(json.detail || "Ошибка создания платежа");
+              if (!res.ok) {
+                var detail = json.detail;
+                var msg = "Ошибка создания платежа";
+                if (detail != null) {
+                  msg = Array.isArray(detail) ? (detail[0] && detail[0].msg ? detail[0].msg : detail.join(" ")) : String(detail);
+                }
+                throw new Error(msg);
+              }
               return json;
             });
           })

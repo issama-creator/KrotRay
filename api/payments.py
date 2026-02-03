@@ -84,20 +84,53 @@ def create_payment(
     except ImportError:
         raise HTTPException(status_code=503, detail="yookassa не установлен: pip install yookassa")
 
-    payment_method_type = "sbp" if body.method == "sbp" else "bank_card"
-    payload = {
-        "amount": {"value": amount_str, "currency": "RUB"},
-        "confirmation": {"type": "redirect", "return_url": PAYMENT_RETURN_URL},
-        "capture": True,
-        "description": f"KrotVPN {months} мес.",
-        "payment_method_data": {"type": payment_method_type},
-    }
+    if not PAYMENT_RETURN_URL:
+        raise HTTPException(
+            status_code=503,
+            detail="Не задан PAYMENT_RETURN_URL в .env",
+        )
 
-    try:
-        yoo = YooPayment.create(payload)
-    except Exception as e:
-        logger.exception("YooKassa create failed: %s", e)
-        raise HTTPException(status_code=502, detail="Ошибка создания платежа в ЮKassa")
+    def _payload(with_method: bool) -> dict:
+        p = {
+            "amount": {"value": amount_str, "currency": "RUB"},
+            "confirmation": {"type": "redirect", "return_url": PAYMENT_RETURN_URL},
+            "capture": True,
+            "description": f"KrotVPN {months} мес.",
+        }
+        if with_method:
+            payment_method_type = "sbp" if body.method == "sbp" else "bank_card"
+            p["payment_method_data"] = {"type": payment_method_type}
+        return p
+
+    def _err_msg(e: Exception) -> str:
+        err_msg = "Ошибка создания платежа в ЮKassa"
+        if hasattr(e, "response_body") and e.response_body:
+            try:
+                import json as _json
+                err_body = _json.loads(e.response_body) if isinstance(e.response_body, str) else e.response_body
+                desc = err_body.get("description") or err_body.get("message") or str(err_body.get("code", ""))
+                if desc:
+                    err_msg = str(desc)
+            except Exception:
+                pass
+        elif getattr(e, "args", None):
+            err_msg = str(e.args[0])[:500]
+        return err_msg
+
+    yoo = None
+    last_error = None
+    for with_method in (True, False):
+        try:
+            yoo = YooPayment.create(_payload(with_method))
+            break
+        except Exception as e:
+            last_error = e
+            logger.warning("YooKassa create (with_method=%s) failed: %s", with_method, e)
+            if not with_method:
+                raise HTTPException(status_code=502, detail=_err_msg(e)) from e
+    if yoo is None and last_error is not None:
+        logger.exception("YooKassa create failed: %s", last_error)
+        raise HTTPException(status_code=502, detail=_err_msg(last_error)) from last_error
 
     yoo_id = yoo.id
     confirmation_url = ""
