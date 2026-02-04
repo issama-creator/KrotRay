@@ -16,6 +16,8 @@
   var apiBase = params.get("api") || "http://localhost:8000";
   apiBase = apiBase.replace(/\/$/, "");
 
+  var REFER_LINK = "https://t.me/krotraybot";
+
   var STATE = "NO_SUBSCRIPTION";
   var data = { subscription: null };
 
@@ -58,7 +60,6 @@
   }
 
   function render() {
-    var statusText = document.getElementById("status-text");
     var statusSubtitle = document.getElementById("status-subtitle");
     var statusPill = document.getElementById("status-pill");
     var statusPillText = document.getElementById("status-pill-text");
@@ -70,7 +71,6 @@
     }
 
     if (STATE === "loading") {
-      if (statusText) { statusText.textContent = "Загрузка..."; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Загрузка...";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
@@ -79,7 +79,6 @@
     }
 
     if (STATE === "error") {
-      if (statusText) { statusText.textContent = "Ошибка загрузки"; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Ошибка";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
@@ -91,28 +90,24 @@
     if (STATE === "ACTIVE") {
       var sub = data.subscription;
       var left = daysLeft(sub.expires_at);
-      if (statusText) { statusText.textContent = "Активен"; statusText.className = "balance-value active"; }
       if (statusSubtitle) statusSubtitle.textContent = "Осталось " + left + " " + pluralDays(left);
       if (statusPillText) statusPillText.textContent = "Статус: Активен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
       setBuyButtonLabel("Продлить подписку");
     } else if (STATE === "EXPIRED") {
-      if (statusText) { statusText.textContent = "Просрочен"; statusText.className = "balance-value expired"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Просрочен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
       if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
       setBuyButtonLabel("Продлить подписку");
     } else if (STATE === "PAYMENT_PENDING") {
-      if (statusText) { statusText.textContent = "Оплата в процессе..."; statusText.className = "balance-value pending"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Оплата в процессе...";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_pending";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Оформить подписку");
     } else {
-      if (statusText) { statusText.textContent = "Подписка не активна"; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Подписка не активна";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
@@ -285,6 +280,33 @@
           tg.showAlert && tg.showAlert("Скопировано");
         } catch (e) {
           tg.showAlert && tg.showAlert("Скопируйте вручную");
+        }
+      };
+    }
+
+    var btnReferShare = document.getElementById("btn-refer-share");
+    var btnReferCopy = document.getElementById("btn-refer-copy");
+    if (btnReferShare) {
+      btnReferShare.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
+        var shareUrl = "https://t.me/share/url?url=" + encodeURIComponent(REFER_LINK) + "&text=" + encodeURIComponent("Присоединяйся к KrotRay VPN");
+        if (tg.openTelegramLink) {
+          tg.openTelegramLink(shareUrl);
+        } else if (tg.openLink) {
+          tg.openLink(shareUrl);
+        } else {
+          window.open(shareUrl, "_blank");
+        }
+      };
+    }
+    if (btnReferCopy) {
+      btnReferCopy.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+        try {
+          navigator.clipboard.writeText(REFER_LINK);
+          tg.showAlert && tg.showAlert("Ссылка скопирована");
+        } catch (e) {
+          tg.showAlert && tg.showAlert("Скопируйте ссылку вручную");
         }
       };
     }

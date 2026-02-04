@@ -17,7 +17,7 @@
       <!-- Экран 1: Главная (Личный кабинет) -->
       <div class="screen screen-main" id="screen-main">
         <section class="balance-section">
-          <p class="balance-value" id="status-text">Подписка не активна</p>
+          <h2 class="main-title">Личный кабинет</h2>
           <p class="balance-subtitle" id="status-subtitle"></p>
         </section>
         <section class="action-row">
@@ -34,9 +34,25 @@
           <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ доступа появится после оплаты">
           <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Скопировать</button>
         </section>
+        <section class="refer-section">
+          <div class="refer-card">
+            <p class="refer-emoji" aria-hidden="true">🤝</p>
+            <h3 class="refer-title">Пригласи друга и получи 10 дней подписки бесплатно</h3>
+            <p class="refer-desc">Отправьте ссылку другу. После его регистрации вы получите 10 дней подписки бесплатно.</p>
+            <div class="refer-actions">
+              <button type="button" class="btn btn_primary refer-btn" id="btn-refer-share">
+                <span class="refer-btn__icon">↗</span>
+                <span>Отправить</span>
+              </button>
+              <button type="button" class="btn btn_secondary refer-btn" id="btn-refer-copy">
+                <span class="refer-btn__icon">⎘</span>
+                <span>Скопировать</span>
+              </button>
+            </div>
+          </div>
+        </section>
         <footer class="footer">
-          <p class="footer__support">Поддержка: <a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">@krotraybot</a></p>
-          <p class="footer__handle">@krotraybot</p>
+          <p class="footer__support"><a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">Поддержка</a></p>
         </footer>
       </div>
 
