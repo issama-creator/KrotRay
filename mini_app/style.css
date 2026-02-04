@@ -265,9 +265,9 @@ body {
 }
 
 .action-btn_primary {
-  flex: 1 1 36%;
+  flex: 1 1 40%;
   min-width: 0;
-  max-width: 46%;
+  max-width: 50%;
   font-size: 14px;
   font-weight: 600;
   min-height: 48px;
