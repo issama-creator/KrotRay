@@ -11,6 +11,6 @@ router = Router(name="main")
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     await message.answer(
-        "Добро пожаловать! Нажмите кнопку ниже, чтобы открыть личный кабинет.",
+        "Добро пожаловать в KrotRay! Нажмите кнопку ниже, чтобы открыть личный кабинет.",
         reply_markup=get_main_keyboard(MINI_APP_URL, API_URL),
     )
