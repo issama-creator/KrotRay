@@ -91,6 +91,7 @@ body {
   font-size: 22px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
+  text-align: center;
 }
 
 .payment-method {
@@ -404,6 +405,13 @@ body {
   border-color: #3b82f6;
 }
 
+.tariff-row__info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .tariff-row__period {
   flex: 1;
   font-size: 16px;
@@ -411,29 +419,27 @@ body {
   color: var(--tg-theme-text-color, #e6e6e6);
 }
 
+.tariff-row__savings {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
+.tariff-row__savings .tariff-savings__amount {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+/* Первый тариф (1 месяц) — период без обёртки info */
+.tariff-row:first-child .tariff-row__period {
+  flex: 1;
+}
+
 .tariff-row__price {
   flex: 0 0 auto;
   font-size: 16px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
-}
-
-.tariff-savings {
-  margin: 0;
-  padding: 10px 16px 12px;
-  font-size: 14px;
-  color: var(--tg-theme-hint-color, #71717a);
-  border-top: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
-}
-
-.tariff-savings__amount {
-  color: #3b82f6;
-  font-weight: 600;
-}
-
-.tariff-savings .tariff-savings__amount {
-  color: #3ddc84;
-  font-weight: 600;
 }
 
 .buy-section {
