@@ -114,6 +114,7 @@ body {
   padding: 12px 0;
   background: none;
   border: none;
+  border-bottom: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
   cursor: pointer;
   text-align: left;
   color: inherit;
@@ -121,12 +122,44 @@ body {
   gap: 12px;
 }
 
+.payment-method__row:last-of-type {
+  border-bottom: none;
+}
+
 .payment-method__row:active {
   opacity: 0.9;
 }
 
+.payment-method__icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.payment-method__icon_sbp {
+  background: linear-gradient(135deg, #00c853 0%, #00e676 25%, #ffab00 50%, #ff6d00 75%, #2962ff 100%);
+}
+
+.payment-method__icon_card {
+  background: #3b82f6;
+  position: relative;
+}
+
+.payment-method__icon_card::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 2px;
+}
+
 .payment-method__radio {
   flex-shrink: 0;
+  margin-left: auto;
   width: 20px;
   height: 20px;
   border: 2px solid var(--tg-theme-hint-color, #94a3b8);
@@ -135,8 +168,8 @@ body {
 }
 
 .payment-method__row_selected .payment-method__radio {
-  border-color: #22c55e;
-  background: #22c55e;
+  border-color: #3b82f6;
+  background: #3b82f6;
   box-shadow: inset 0 0 0 3px var(--tg-theme-bg-color, #0f0f14);
 }
 
@@ -260,7 +293,7 @@ body {
   border-color: rgba(234, 179, 8, 0.3);
 }
 
-/* 3. Участок: Данные доступа + кнопка «Открыть данные доступа» на всю ширину */
+/* 3. Участок: Ключ доступа + кнопка «Скопировать» на всю ширину */
 .key-section {
   margin-bottom: 28px;
 }
@@ -320,23 +353,31 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-.tariff-options {
-  display: flex;
-  flex-direction: column;
+.tariff-card {
+  background: var(--tg-theme-secondary-bg-color, #1c1c22);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 4px;
 }
 
 .tariff-row {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 12px 0;
+  padding: 12px 16px;
   background: none;
   border: none;
+  border-bottom: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
   cursor: pointer;
   text-align: left;
   color: inherit;
   font: inherit;
   gap: 12px;
+}
+
+.tariff-row:last-of-type {
+  border-bottom: none;
 }
 
 .tariff-row:active {
@@ -345,6 +386,7 @@ body {
 
 .tariff-row__radio {
   flex-shrink: 0;
+  margin-left: auto;
   width: 20px;
   height: 20px;
   border: 2px solid var(--tg-theme-hint-color, #94a3b8);
@@ -353,13 +395,13 @@ body {
 }
 
 .tariff-row_selected .tariff-row__radio {
-  border-color: #22c55e;
-  background: #22c55e;
+  border-color: #3b82f6;
+  background: #3b82f6;
   box-shadow: inset 0 0 0 3px var(--tg-theme-bg-color, #0f0f14);
 }
 
 .tariff-row:hover .tariff-row__radio {
-  border-color: #22c55e;
+  border-color: #3b82f6;
 }
 
 .tariff-row__period {
@@ -377,9 +419,16 @@ body {
 }
 
 .tariff-savings {
-  margin: 4px 0 0 32px;
+  margin: 0;
+  padding: 10px 16px 12px;
   font-size: 14px;
-  color: #3ddc84;
+  color: var(--tg-theme-hint-color, #71717a);
+  border-top: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
+}
+
+.tariff-savings__amount {
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 .tariff-savings .tariff-savings__amount {

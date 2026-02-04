@@ -30,9 +30,9 @@
           </div>
         </section>
         <section class="key-section">
-          <label class="key-section__label">Данные доступа</label>
-          <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Данные доступа появятся после оплаты">
-          <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Открыть данные доступа</button>
+          <label class="key-section__label">Ключ доступа</label>
+          <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ доступа появится после оплаты">
+          <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Скопировать</button>
         </section>
         <footer class="footer">
           <p class="footer__support">Поддержка: <a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">@krotraybot</a></p>
@@ -46,16 +46,16 @@
         <section class="tariffs">
           <h2 class="section-title">Тарифы</h2>
           <p class="tariffs__note">Подписка · 1 устройство</p>
-          <div class="tariff-options">
+          <div class="tariff-card">
             <button type="button" class="tariff-row tariff-row_selected" data-months="1" data-price="100" id="tariff-1">
-              <span class="tariff-row__radio"></span>
               <span class="tariff-row__period">1 месяц</span>
               <span class="tariff-row__price">100 ₽</span>
+              <span class="tariff-row__radio"></span>
             </button>
             <button type="button" class="tariff-row" data-months="3" data-price="250" id="tariff-3">
-              <span class="tariff-row__radio"></span>
               <span class="tariff-row__period">3 месяца</span>
               <span class="tariff-row__price">250 ₽</span>
+              <span class="tariff-row__radio"></span>
             </button>
             <p class="tariff-savings">Экономия <span class="tariff-savings__amount">50 ₽</span></p>
           </div>
@@ -64,12 +64,14 @@
             <div class="payment-method">
               <span class="payment-method__label">Способ оплаты</span>
               <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="method-sbp">
-                <span class="payment-method__radio"></span>
+                <span class="payment-method__icon payment-method__icon_sbp" aria-hidden="true"></span>
                 <span class="payment-method__text">СБП</span>
+                <span class="payment-method__radio"></span>
               </button>
               <button type="button" class="payment-method__row" data-method="card" id="method-card">
-                <span class="payment-method__radio"></span>
+                <span class="payment-method__icon payment-method__icon_card" aria-hidden="true"></span>
                 <span class="payment-method__text">Оплата картой</span>
+                <span class="payment-method__radio"></span>
               </button>
             </div>
             <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
