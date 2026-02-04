@@ -72,7 +72,7 @@
     if (STATE === "loading") {
       if (statusText) { statusText.textContent = "Загрузка..."; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
-      if (statusPillText) statusPillText.textContent = "Загрузка...";
+      if (statusPillText) statusPillText.textContent = "Статус: Загрузка...";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
       return;
@@ -81,7 +81,7 @@
     if (STATE === "error") {
       if (statusText) { statusText.textContent = "Ошибка загрузки"; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
-      if (statusPillText) statusPillText.textContent = "Ошибка";
+      if (statusPillText) statusPillText.textContent = "Статус: Ошибка";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Оформить подписку");
@@ -93,28 +93,28 @@
       var left = daysLeft(sub.expires_at);
       if (statusText) { statusText.textContent = "Активен"; statusText.className = "balance-value active"; }
       if (statusSubtitle) statusSubtitle.textContent = "Осталось " + left + " " + pluralDays(left);
-      if (statusPillText) statusPillText.textContent = "Активен";
+      if (statusPillText) statusPillText.textContent = "Статус: Активен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
       setBuyButtonLabel("Продлить подписку");
     } else if (STATE === "EXPIRED") {
       if (statusText) { statusText.textContent = "Просрочен"; statusText.className = "balance-value expired"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
-      if (statusPillText) statusPillText.textContent = "Просрочен";
+      if (statusPillText) statusPillText.textContent = "Статус: Просрочен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
       if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
       setBuyButtonLabel("Продлить подписку");
     } else if (STATE === "PAYMENT_PENDING") {
       if (statusText) { statusText.textContent = "Оплата в процессе..."; statusText.className = "balance-value pending"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
-      if (statusPillText) statusPillText.textContent = "Оплата...";
+      if (statusPillText) statusPillText.textContent = "Статус: Оплата в процессе...";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_pending";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Оформить подписку");
     } else {
       if (statusText) { statusText.textContent = "Подписка не активна"; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
-      if (statusPillText) statusPillText.textContent = "Подписка не активна";
+      if (statusPillText) statusPillText.textContent = "Статус: Подписка не активна";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Оформить подписку");

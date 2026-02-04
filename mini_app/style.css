@@ -250,6 +250,8 @@ body {
 }
 
 .action-btn_primary {
+  flex: 1;
+  min-width: 0;
   background: linear-gradient(180deg, #4f8cff 0%, #2563eb 100%);
   color: #fff;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
@@ -273,11 +275,14 @@ body {
 }
 
 .action-btn_status {
+  flex: 0 1 auto;
+  min-width: 0;
   background: var(--tg-theme-secondary-bg-color, #1c1c22);
   color: var(--tg-theme-hint-color, #a1a1aa);
   border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.1));
   cursor: default;
 }
+
 
 .action-btn_status.status_active {
   color: #22c55e;
