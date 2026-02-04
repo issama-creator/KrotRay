@@ -238,7 +238,7 @@ body {
 /* 2. Ряд: Статус и кнопка «Получить ключ» / «Продлить ключ» */
 .action-row {
   display: flex;
-  gap: 12px;
+  gap: 5px;
   margin-bottom: 24px;
 }
 
