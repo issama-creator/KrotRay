@@ -91,7 +91,7 @@
       var sub = data.subscription;
       var left = daysLeft(sub.expires_at);
       if (statusSubtitle) statusSubtitle.textContent = "Осталось " + left + " " + pluralDays(left);
-      if (statusPillText) statusPillText.textContent = "Статус: Активен " + left + " " + pluralDays(left);
+      if (statusPillText) statusPillText.textContent = "Активен: " + left + " " + pluralDays(left);
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
       setBuyButtonLabel("Продлить ключ");
