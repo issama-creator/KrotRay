@@ -84,7 +84,7 @@
       if (statusPillText) statusPillText.textContent = "Ошибка";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
-      setBuyButtonLabel("Купить ключ");
+      setBuyButtonLabel("Оформить подписку");
       return;
     }
 
@@ -96,28 +96,28 @@
       if (statusPillText) statusPillText.textContent = "Активен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
-      setBuyButtonLabel("Продлить ключ");
+      setBuyButtonLabel("Продлить подписку");
     } else if (STATE === "EXPIRED") {
       if (statusText) { statusText.textContent = "Просрочен"; statusText.className = "balance-value expired"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Просрочен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
       if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
-      setBuyButtonLabel("Продлить ключ");
+      setBuyButtonLabel("Продлить подписку");
     } else if (STATE === "PAYMENT_PENDING") {
       if (statusText) { statusText.textContent = "Оплата в процессе..."; statusText.className = "balance-value pending"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Оплата...";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_pending";
       if (keyInput) keyInput.value = "";
-      setBuyButtonLabel("Купить ключ");
+      setBuyButtonLabel("Оформить подписку");
     } else {
-      if (statusText) { statusText.textContent = "Ключ не активен"; statusText.className = "balance-value"; }
+      if (statusText) { statusText.textContent = "Подписка не активна"; statusText.className = "balance-value"; }
       if (statusSubtitle) statusSubtitle.textContent = "";
-      if (statusPillText) statusPillText.textContent = "Ключ не активен";
+      if (statusPillText) statusPillText.textContent = "Подписка не активна";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
-      setBuyButtonLabel("Купить ключ");
+      setBuyButtonLabel("Оформить подписку");
     }
   }
 
@@ -274,7 +274,7 @@
       btnCopy.onclick = function () {
         var input = document.getElementById("key-input");
         if (!input || !input.value.trim()) {
-          tg.showAlert && tg.showAlert("Сначала приобретите ключ");
+          tg.showAlert && tg.showAlert("Сначала оформите подписку");
           return;
         }
         tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
@@ -282,9 +282,9 @@
         input.setSelectionRange(0, 99999);
         try {
           navigator.clipboard.writeText(input.value);
-          tg.showAlert && tg.showAlert("Ключ скопирован");
+          tg.showAlert && tg.showAlert("Скопировано");
         } catch (e) {
-          tg.showAlert && tg.showAlert("Скопируйте ключ вручную");
+          tg.showAlert && tg.showAlert("Скопируйте вручную");
         }
       };
     }

@@ -17,22 +17,22 @@
       <!-- Экран 1: Главная (Личный кабинет) -->
       <div class="screen screen-main" id="screen-main">
         <section class="balance-section">
-          <p class="balance-value" id="status-text">Ключ не активен</p>
+          <p class="balance-value" id="status-text">Подписка не активна</p>
           <p class="balance-subtitle" id="status-subtitle"></p>
         </section>
         <section class="action-row">
           <button type="button" class="action-btn action-btn_primary" id="btn-buy-key-top">
             <span class="action-btn__icon action-btn__icon_plus">+</span>
-            <span class="action-btn__text" id="btn-buy-key-top-text">Купить ключ</span>
+            <span class="action-btn__text" id="btn-buy-key-top-text">Оформить подписку</span>
           </button>
           <div class="action-btn action-btn_status" id="status-pill">
-            <span class="action-btn__text" id="status-pill-text">Ключ не активен</span>
+            <span class="action-btn__text" id="status-pill-text">Подписка не активна</span>
           </div>
         </section>
         <section class="key-section">
-          <label class="key-section__label">Ключ</label>
-          <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Ключ появится после оплаты">
-          <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Скопировать</button>
+          <label class="key-section__label">Данные доступа</label>
+          <input type="text" class="key-field__input" id="key-input" readonly value="" placeholder="Данные доступа появятся после оплаты">
+          <button type="button" class="btn btn_secondary btn_copy_full" id="btn-copy">Открыть данные доступа</button>
         </section>
         <footer class="footer">
           <p class="footer__support">Поддержка: <a href="https://t.me/krotraybot" class="footer__link" target="_blank" rel="noopener">@krotraybot</a></p>
@@ -40,12 +40,12 @@
         </footer>
       </div>
 
-      <!-- Экран 2: Тарифы (по нажатию Купить/Продлить ключ) -->
+      <!-- Экран 2: Тарифы (по нажатию Оформить/Продлить подписку) -->
       <div class="screen screen-tariffs screen_hidden" id="screen-tariffs">
         <button type="button" class="tariffs-back" id="btn-tariffs-back">← Назад</button>
         <section class="tariffs">
           <h2 class="section-title">Тарифы</h2>
-          <p class="tariffs__note">Один ключ · Одно устройство</p>
+          <p class="tariffs__note">Подписка · 1 устройство</p>
           <div class="tariff-options">
             <button type="button" class="tariff-row tariff-row_selected" data-months="1" data-price="100" id="tariff-1">
               <span class="tariff-row__radio"></span>
