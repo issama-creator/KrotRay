@@ -83,7 +83,7 @@
       if (statusPillText) statusPillText.textContent = "Статус: Ошибка";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
-      setBuyButtonLabel("Оформить подписку");
+      setBuyButtonLabel("Получить ключ");
       return;
     }
 
@@ -94,25 +94,25 @@
       if (statusPillText) statusPillText.textContent = "Статус: Активен " + left + " " + pluralDays(left);
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
-      setBuyButtonLabel("Продлить подписку");
+      setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "EXPIRED") {
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Просрочен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
       if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
-      setBuyButtonLabel("Продлить подписку");
+      setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "PAYMENT_PENDING") {
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Оплата в процессе...";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_pending";
       if (keyInput) keyInput.value = "";
-      setBuyButtonLabel("Оформить подписку");
+      setBuyButtonLabel("Получить ключ");
     } else {
       if (statusSubtitle) statusSubtitle.textContent = "";
       if (statusPillText) statusPillText.textContent = "Статус: Не активен";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
-      setBuyButtonLabel("Оформить подписку");
+      setBuyButtonLabel("Получить ключ");
     }
   }
 
@@ -269,7 +269,7 @@
       btnCopy.onclick = function () {
         var input = document.getElementById("key-input");
         if (!input || !input.value.trim()) {
-          tg.showAlert && tg.showAlert("Сначала оформите подписку");
+          tg.showAlert && tg.showAlert("Сначала получите ключ");
           return;
         }
         tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");

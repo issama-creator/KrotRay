@@ -235,7 +235,7 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-/* 2. Ряд из двух: «Оформить подписку» (+) и Статус */
+/* 2. Ряд: Статус и кнопка «Получить ключ» / «Продлить ключ» */
 .action-row {
   display: flex;
   gap: 12px;
@@ -265,8 +265,9 @@ body {
 }
 
 .action-btn_primary {
-  flex: 1;
+  flex: 1 1 55%;
   min-width: 0;
+  max-width: 68%;
   font-size: 14px;
   font-weight: 600;
   min-height: 48px;
