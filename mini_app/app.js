@@ -91,7 +91,7 @@
       var sub = data.subscription;
       var left = daysLeft(sub.expires_at);
       if (statusSubtitle) statusSubtitle.textContent = "Осталось " + left + " " + pluralDays(left);
-      if (statusPillText) statusPillText.textContent = "Статус: Активен";
+      if (statusPillText) statusPillText.textContent = "Статус: Активен " + left + " " + pluralDays(left);
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
       if (keyInput) keyInput.value = sub.key || "";
       setBuyButtonLabel("Продлить подписку");
@@ -109,7 +109,7 @@
       setBuyButtonLabel("Оформить подписку");
     } else {
       if (statusSubtitle) statusSubtitle.textContent = "";
-      if (statusPillText) statusPillText.textContent = "Статус: Подписка не активна";
+      if (statusPillText) statusPillText.textContent = "Статус: Не активен";
       if (statusPill) statusPill.className = "action-btn action-btn_status";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Оформить подписку");

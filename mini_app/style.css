@@ -267,9 +267,17 @@ body {
 .action-btn_primary {
   flex: 1;
   min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 48px;
+  padding: 12px 14px;
   background: linear-gradient(180deg, #4f8cff 0%, #2563eb 100%);
   color: #fff;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.action-btn_primary .action-btn__text {
+  font-size: 14px;
 }
 
 .action-btn__icon {
