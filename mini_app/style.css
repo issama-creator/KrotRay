@@ -251,7 +251,7 @@ body {
   min-height: 52px;
   padding: 14px 16px;
   border: none;
-  border-radius: 14px;
+  border-radius: 18px;
   font-size: 16px;
   font-weight: 600;
   font-family: inherit;
@@ -265,9 +265,9 @@ body {
 }
 
 .action-btn_primary {
-  flex: 1 1 45%;
+  flex: 1 1 40%;
   min-width: 0;
-  max-width: 55%;
+  max-width: 50%;
   font-size: 14px;
   font-weight: 600;
   min-height: 48px;
