@@ -195,15 +195,15 @@ body {
   margin-top: 12px;
 }
 
-/* Заголовок главного экрана */
+/* Заголовок главного экрана — слева в углу */
 .balance-section {
   margin-bottom: 24px;
-  text-align: center;
+  text-align: left;
 }
 
 .main-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--tg-theme-text-color, #e4e4e7);
   letter-spacing: -0.02em;
@@ -292,10 +292,22 @@ body {
 .action-btn_status {
   flex: 0 1 auto;
   min-width: 0;
+  max-width: 50%;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
   background: var(--tg-theme-secondary-bg-color, #1c1c22);
   color: var(--tg-theme-hint-color, #a1a1aa);
   border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.1));
   cursor: default;
+}
+
+.action-btn_status .action-btn__text {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 
