@@ -77,7 +77,7 @@ def get_pending_payment(db: Session, user_id: int) -> Payment | None:
 
 @router.get("/me")
 def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Профиль и статус подписки."""
+    """Профиль и статус подписки. Активная подписка имеет приоритет над pending-платежом."""
     sub = get_active_subscription(db, user.id)
     pending = get_pending_payment(db, user.id)
 
@@ -89,10 +89,7 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
         },
     }
 
-    if pending:
-        response["subscription"] = None
-        response["state"] = "payment_pending"
-    elif sub:
+    if sub:
         expires_at = sub.expires_at
         if isinstance(expires_at, datetime) and expires_at.tzinfo:
             expires_str = expires_at.isoformat()
@@ -112,6 +109,9 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
             "key": sub.uuid,
         }
         response["state"] = "expired" if is_expired else "active"
+    elif pending:
+        response["subscription"] = None
+        response["state"] = "payment_pending"
     else:
         response["subscription"] = None
         response["state"] = "no_subscription"
