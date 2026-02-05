@@ -100,14 +100,15 @@ def _add_user_grpc(
         flow="xtls-rprx-vision",
         encryption="none",
     )
+    # Xray ожидает Type = FullName (без type.googleapis.com/), см. common/serial/typed_message.go
     account_typed = typed_message_pb2.TypedMessage(
-        type="type.googleapis.com/xray.proxy.vless.Account",
+        type="xray.proxy.vless.Account",
         value=vless_account.SerializeToString(),
     )
     user = user_pb2.User(level=0, email=email, account=account_typed)
     add_op = command_pb2.AddUserOperation(user=user)
     op_typed = typed_message_pb2.TypedMessage(
-        type="type.googleapis.com/xray.app.proxyman.command.AddUserOperation",
+        type="xray.app.proxyman.command.AddUserOperation",
         value=add_op.SerializeToString(),
     )
     req = command_pb2.AlterInboundRequest(tag=inbound_tag, operation=op_typed)
@@ -133,7 +134,7 @@ def _remove_user_grpc(
 
     remove_op = command_pb2.RemoveUserOperation(email=email)
     op_typed = typed_message_pb2.TypedMessage(
-        type="type.googleapis.com/xray.app.proxyman.command.RemoveUserOperation",
+        type="xray.app.proxyman.command.RemoveUserOperation",
         value=remove_op.SerializeToString(),
     )
     req = command_pb2.AlterInboundRequest(tag=inbound_tag, operation=op_typed)
