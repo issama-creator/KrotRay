@@ -1,14 +1,22 @@
-"""API маршруты для Mini App."""
+"""API маршруты для Mini App (Итерация 6.2: VLESS-ключ, GET /api/key)."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.auth import get_or_create_user, verify_init_data
+from bot.config import VLESS_URL_TEMPLATE
 from db.models import Payment, Subscription, User
 from db.session import get_session
+
+
+def build_vless_url(uuid: str | None) -> str | None:
+    """Собирает VLESS-ссылку из шаблона, подставляя UUID. Если шаблон пустой или uuid нет — None."""
+    if not uuid or not VLESS_URL_TEMPLATE:
+        return None
+    return VLESS_URL_TEMPLATE.replace("{uuid}", uuid)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["mini-app"])
@@ -100,18 +108,21 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
         else:
             expires_str = expires_at.strftime("%Y-%m-%dT%H:%M:%S") if expires_at else None
 
-        from datetime import datetime as dt
-        from datetime import timezone
-        now = dt.now(timezone.utc)
-        sub_expires = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        sub_expires = expires_at if (expires_at and expires_at.tzinfo) else (expires_at.replace(tzinfo=timezone.utc) if expires_at else now)
         is_expired = sub_expires < now
 
-        response["subscription"] = {
+        sub_payload = {
             "status": "expired" if is_expired else sub.status,
             "expires_at": expires_str,
             "tariff_months": sub.tariff_months,
             "key": sub.uuid,
         }
+        if sub.uuid and not is_expired:
+            sub_payload["vless_url"] = build_vless_url(sub.uuid)
+        else:
+            sub_payload["vless_url"] = None
+        response["subscription"] = sub_payload
         response["state"] = "expired" if is_expired else "active"
     elif pending:
         response["subscription"] = None
@@ -121,3 +132,28 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
         response["state"] = "no_subscription"
 
     return response
+
+
+@router.get("/key")
+def get_key(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Возвращает VLESS-ключ для активной подписки: vless_url, expires_at, days_left.
+    Если активной подписки с ключом нет — vless_url null, days_left 0.
+    """
+    sub = get_active_subscription(db, user.id)
+    now = datetime.now(timezone.utc)
+    if not sub or not sub.uuid:
+        return {"vless_url": None, "expires_at": None, "days_left": 0}
+    expires_at = sub.expires_at
+    if isinstance(expires_at, datetime) and expires_at.tzinfo:
+        expires_str = expires_at.isoformat()
+    else:
+        expires_str = expires_at.strftime("%Y-%m-%dT%H:%M:%S") if expires_at else None
+    sub_expires = expires_at if (expires_at and expires_at.tzinfo) else (expires_at.replace(tzinfo=timezone.utc) if expires_at else now)
+    is_expired = sub_expires < now
+    if is_expired:
+        return {"vless_url": None, "expires_at": expires_str, "days_left": 0}
+    delta = sub_expires - now
+    days_left = max(0, delta.days)
+    vless_url = build_vless_url(sub.uuid)
+    return {"vless_url": vless_url, "expires_at": expires_str, "days_left": days_left}

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package xray.proxy.vless;
+option go_package = "github.com/xtls/xray-core/proxy/vless";
+
+message Reverse {
+  string tag = 1;
+}
+
+message Account {
+  string id = 1;
+  string flow = 2;
+  string encryption = 3;
+  uint32 xorMode = 4;
+  uint32 seconds = 5;
+  string padding = 6;
+  Reverse reverse = 7;
+  uint32 testpre = 8;
+  repeated uint32 testseed = 9;
+}

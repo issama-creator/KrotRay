@@ -6,3 +6,7 @@ psycopg2-binary>=2.9.0
 fastapi>=0.115.0
 uvicorn>=0.32.0
 yookassa>=3.0.0
+grpcio>=1.76.0
+grpcio-tools>=1.76.0
+protobuf>=4.25.0
+apscheduler>=3.10.0

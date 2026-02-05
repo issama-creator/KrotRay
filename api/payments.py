@@ -1,6 +1,7 @@
-"""Платежи ЮKassa (Итерация 5)."""
+"""Платежи ЮKassa (Итерация 5) + Xray доступ (Итерация 6.1)."""
 import logging
 from datetime import datetime, timezone, timedelta
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
@@ -8,8 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.auth import get_or_create_user, verify_init_data
+from api.server import get_least_loaded_server
+from api.xray_grpc import add_user_to_xray
 from bot.config import PAYMENT_RETURN_URL, YOOKASSA_SECRET_KEY, YOOKASSA_SHOP_ID
-from db.models import Payment, Subscription, User
+from db.models import Payment, Server, Subscription, User
 from db.session import get_session
 
 logger = logging.getLogger(__name__)
@@ -210,16 +213,44 @@ def webhook(request: dict, db: Session = Depends(get_db)):
             db.commit()
             logger.info("Subscription extended user_id=%s expires_at=%s", payment.user_id, expires_at)
         else:
+            # Итерация 6.1: выбор сервера, создание клиента в Xray, сохранение uuid и server_id
+            server = get_least_loaded_server(db)
+            sub_uuid: str | None = None
+            sub_server_id: int | None = None
+            if server:
+                sub_uuid = str(uuid4())
+                email = f"user_{payment.user_id}"
+                try:
+                    add_user_to_xray(
+                        host=server.host,
+                        grpc_port=server.grpc_port,
+                        user_uuid=sub_uuid,
+                        email=email,
+                    )
+                    sub_server_id = server.id
+                    server.active_users += 1
+                    db.add(server)
+                    logger.info(
+                        "Xray AddUser ok: user_id=%s server_id=%s uuid=%s",
+                        payment.user_id, server.id, sub_uuid,
+                    )
+                except Exception as e:
+                    logger.exception("Xray AddUser failed, subscription without key: %s", e)
+                    sub_uuid = None
+                    sub_server_id = None
+            else:
+                logger.warning("No enabled server for user_id=%s, subscription without key", payment.user_id)
+
             sub = Subscription(
                 user_id=payment.user_id,
                 status="active",
                 expires_at=expires_at,
                 tariff_months=payment.tariff_months,
-                uuid=None,
-                server_id=None,
+                uuid=sub_uuid,
+                server_id=sub_server_id,
             )
             db.add(sub)
             db.commit()
-            logger.info("Subscription created user_id=%s expires_at=%s", payment.user_id, expires_at)
+            logger.info("Subscription created user_id=%s expires_at=%s server_id=%s", payment.user_id, expires_at, sub_server_id)
 
     return {"ok": True}

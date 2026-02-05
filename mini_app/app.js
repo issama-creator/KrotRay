@@ -89,12 +89,12 @@
       var left = daysLeft(sub.expires_at);
       if (statusPillText) statusPillText.textContent = "Активен: " + left + " " + pluralDays(left);
       if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
-      if (keyInput) keyInput.value = sub.key || "";
+      if (keyInput) keyInput.value = (sub.vless_url || sub.key) || "";
       setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "EXPIRED") {
       if (statusPillText) statusPillText.textContent = "Статус: Просрочен";
       if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
-      if (keyInput) keyInput.value = data.subscription && data.subscription.key ? data.subscription.key : "";
+      if (keyInput) keyInput.value = (data.subscription && (data.subscription.vless_url || data.subscription.key)) || "";
       setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "PAYMENT_PENDING") {
       if (statusPillText) statusPillText.textContent = "Статус: Оплата в процессе...";

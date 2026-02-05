@@ -436,3 +436,69 @@ systemctl restart krotray
 
 3. **Проверь .env на сервере:**  
    `grep -E "BOT_TOKEN|API_URL|DATABASE_URL" /opt/krotray/.env` — BOT_TOKEN не пустой, API_URL=https://krotray.ru, DATABASE_URL=postgresql://...
+
+---
+
+## Xray-сервер (Итерация 6.1): куда ставить и как добавить в бота
+
+### Куда ставить Xray
+
+- **Вариант A — Xray на том же VDS, что и бот (krotray.ru)**  
+  Удобно: один сервер, всё в одном месте. Установи Xray (или панель 3X-UI / Marzban) на этот VDS, включи gRPC API в конфиге. В `.env` укажи `XRAY_SERVER_HOST=127.0.0.1` и порт gRPC из конфига Xray.
+
+- **Вариант B — Xray на отдельном сервере**  
+  Бот и БД остаются на krotray.ru, Xray — на другом VPS. С машины, где запущен бот, должен быть **сетевой доступ** до `host:grpc_port` (открытый порт, файрвол). В `.env` укажи `XRAY_SERVER_HOST=IP_или_домен_сервера_Xray` и порт gRPC.
+
+**Переносить Xray на VDS бота не обязательно** — достаточно зарегистрировать уже работающий сервер в БД (см. ниже).
+
+### Добавить первый сервер в таблицу `servers`
+
+1. **Миграции уже выполнены** (после `alembic upgrade head` таблица `servers` есть).
+
+2. **В `.env` на VDS с ботом** добавь (подставь свои значения):
+   ```env
+   XRAY_INBOUND_TAG=vless-in
+   XRAY_SERVER_NAME=Main
+   XRAY_SERVER_HOST=103.137.251.165
+   XRAY_GRPC_PORT=8080
+   XRAY_MAX_USERS=100
+   ```
+   - **Xray на отдельном сервере (103.137.251.165), бот на krotray.ru** — оставь `XRAY_SERVER_HOST=103.137.251.165`. Порт `XRAY_GRPC_PORT` возьми из конфига Xray (блок gRPC API, не порт VLESS/443). Тег inbound в конфиге Xray должен совпадать с `XRAY_INBOUND_TAG` (например `vless-in`).
+   - Если Xray на этом же VDS — `XRAY_SERVER_HOST=127.0.0.1`, порт — из конфига Xray (блок gRPC API).
+
+3. **Выполни скрипт один раз** (из корня проекта на VDS):
+   ```bash
+   cd /opt/krotray
+   source venv/bin/activate
+   python scripts/add_first_server.py
+   ```
+   В консоли должно появиться: `Добавлен сервер: Main 127.0.0.1:8080 (max_users=100)` (или твой name/host/port). Повторный запуск не создаст дубликат по одному и тому же host:port.
+
+4. **Проверка в БД** (по желанию):
+   ```bash
+   sudo -u postgres psql -d krotray -c "SELECT id, name, host, grpc_port, active_users, max_users, enabled FROM servers;"
+   ```
+
+После этого при успешной оплате бэкенд будет выбирать этот сервер и создавать в нём клиента (через gRPC, если реализован вызов Xray API).
+
+### Реальный вызов Xray gRPC (AddUser / RemoveUser)
+
+В проекте уже реализован **реальный gRPC-клиент** Xray:
+
+- В папке `proto_xray/` лежат минимальные proto (typed_message, user, vless account, command).
+- Из них генерируются Python-модули в `api/xray_grpc_gen/` (команда ниже).
+- В `api/xray_grpc.py`: `add_user_to_xray()` — добавляет UUID во inbound (AlterInbound + AddUserOperation), `remove_user_from_xray()` — удаляет по email (RemoveUserOperation).
+
+**Регенерация proto** (если менял proto-файлы или после клонирования без сгенерированных файлов):
+
+```bash
+cd /opt/krotray
+source venv/bin/activate
+python -m grpc_tools.protoc -I proto_xray --python_out=api/xray_grpc_gen --grpc_python_out=api/xray_grpc_gen \
+  proto_xray/common/serial/typed_message.proto \
+  proto_xray/common/protocol/user.proto \
+  proto_xray/proxy/vless/account.proto \
+  proto_xray/app/proxyman/command/command.proto
+```
+
+**Важно:** в конфиге Xray на 103.137.251.165 должен быть включён **gRPC API** (inbounds с `sniffing` и настройками VLESS + отдельный API inbound с `grpcSettings` или через `stats`/API). Тег inbound для VLESS должен совпадать с `XRAY_INBOUND_TAG` (например `vless-in`). Порт gRPC API — тот, что указан в `XRAY_GRPC_PORT`.
