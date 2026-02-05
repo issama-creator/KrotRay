@@ -258,6 +258,17 @@
       };
     }
 
+    function showToast(message) {
+      var el = document.getElementById("toast");
+      if (!el) return;
+      el.textContent = message;
+      el.classList.add("toast_visible");
+      clearTimeout(el._toastTimer);
+      el._toastTimer = setTimeout(function () {
+        el.classList.remove("toast_visible");
+      }, 2500);
+    }
+
     if (btnCopy) {
       btnCopy.onclick = function () {
         var input = document.getElementById("key-input");
@@ -270,7 +281,7 @@
         input.setSelectionRange(0, 99999);
         try {
           navigator.clipboard.writeText(input.value);
-          tg.showAlert && tg.showAlert("Скопировано");
+          showToast("Ключ скопирован");
         } catch (e) {
           tg.showAlert && tg.showAlert("Скопируйте вручную");
         }
@@ -297,7 +308,7 @@
         tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
         try {
           navigator.clipboard.writeText(REFER_LINK);
-          tg.showAlert && tg.showAlert("Ссылка скопирована");
+          showToast("Ссылка скопирована");
         } catch (e) {
           tg.showAlert && tg.showAlert("Скопируйте ссылку вручную");
         }

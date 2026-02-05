@@ -676,3 +676,32 @@ body {
 .footer__link:active {
   opacity: 0.8;
 }
+
+/* Тостовое уведомление снизу (как у топовых VPN) */
+.toast {
+  position: fixed;
+  left: 20px;
+  right: 20px;
+  bottom: calc(20px + var(--tg-safe-area-inset-bottom, 0px));
+  padding: 12px 20px;
+  border-radius: 24px;
+  background: var(--tg-theme-secondary-bg-color, #1f1f26);
+  color: var(--tg-theme-text-color, #e4e4e7);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
+  z-index: 9999;
+  transform: translateY(80px);
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s;
+  pointer-events: none;
+}
+
+.toast.toast_visible {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
