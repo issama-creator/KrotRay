@@ -192,7 +192,8 @@ def webhook(request: dict, db: Session = Depends(get_db)):
         db.commit()
 
         now = datetime.now(timezone.utc)
-        expires_at = now + timedelta(days=payment.tariff_months * 31)
+        days_per_month = 30  # 1 мес = 30 дней, 3 мес = 90 дней
+        expires_at = now + timedelta(days=payment.tariff_months * days_per_month)
 
         existing = db.execute(
             select(Subscription)
@@ -203,7 +204,7 @@ def webhook(request: dict, db: Session = Depends(get_db)):
 
         if existing and existing.expires_at and existing.expires_at.replace(tzinfo=timezone.utc) > now:
             base = existing.expires_at.replace(tzinfo=timezone.utc) if existing.expires_at.tzinfo is None else existing.expires_at
-            expires_at = base + timedelta(days=payment.tariff_months * 31)
+            expires_at = base + timedelta(days=payment.tariff_months * days_per_month)
             existing.expires_at = expires_at
             existing.status = "active"
             db.commit()
