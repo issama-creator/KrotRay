@@ -80,6 +80,10 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
     """Профиль и статус подписки. Активная подписка имеет приоритет над pending-платежом."""
     sub = get_active_subscription(db, user.id)
     pending = get_pending_payment(db, user.id)
+    if sub:
+        logger.info("/api/me: user_id=%s sub_id=%s expires_at=%s -> state=active/expired", user.id, sub.id, sub.expires_at)
+    elif pending:
+        logger.info("/api/me: user_id=%s no sub, pending payment_id=%s -> state=payment_pending", user.id, pending.id)
 
     response = {
         "user": {
