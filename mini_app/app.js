@@ -70,15 +70,15 @@
     }
 
     if (STATE === "loading") {
-      if (statusPillText) statusPillText.textContent = "Статус: Загрузка...";
-      if (statusPill) statusPill.className = "action-btn action-btn_status";
+      if (statusPillText) statusPillText.textContent = "Загрузка…";
+      if (statusPill) statusPill.className = "status-card status_card_loading";
       if (keyInput) keyInput.value = "";
       return;
     }
 
     if (STATE === "error") {
-      if (statusPillText) statusPillText.textContent = "Статус: Ошибка";
-      if (statusPill) statusPill.className = "action-btn action-btn_status";
+      if (statusPillText) statusPillText.textContent = "Ошибка загрузки";
+      if (statusPill) statusPill.className = "status-card status_card_error";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Получить ключ");
       return;
@@ -87,23 +87,23 @@
     if (STATE === "ACTIVE") {
       var sub = data.subscription;
       var left = daysLeft(sub.expires_at);
-      if (statusPillText) statusPillText.textContent = "Активен: " + left + " " + pluralDays(left);
-      if (statusPill) statusPill.className = "action-btn action-btn_status status_active";
+      if (statusPillText) statusPillText.textContent = "Активна · осталось " + left + " " + pluralDays(left);
+      if (statusPill) statusPill.className = "status-card status_card_active";
       if (keyInput) keyInput.value = (sub.vless_url || sub.key) || "";
       setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "EXPIRED") {
-      if (statusPillText) statusPillText.textContent = "Статус: Просрочен";
-      if (statusPill) statusPill.className = "action-btn action-btn_status status_expired";
+      if (statusPillText) statusPillText.textContent = "Просрочена";
+      if (statusPill) statusPill.className = "status-card status_card_expired";
       if (keyInput) keyInput.value = (data.subscription && (data.subscription.vless_url || data.subscription.key)) || "";
       setBuyButtonLabel("Продлить ключ");
     } else if (STATE === "PAYMENT_PENDING") {
-      if (statusPillText) statusPillText.textContent = "Статус: Оплата в процессе...";
-      if (statusPill) statusPill.className = "action-btn action-btn_status status_pending";
+      if (statusPillText) statusPillText.textContent = "Ожидание оплаты";
+      if (statusPill) statusPill.className = "status-card status_card_pending";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Получить ключ");
     } else {
-      if (statusPillText) statusPillText.textContent = "Статус: Не активен";
-      if (statusPill) statusPill.className = "action-btn action-btn_status";
+      if (statusPillText) statusPillText.textContent = "Нет активной подписки";
+      if (statusPill) statusPill.className = "status-card";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Получить ключ");
     }

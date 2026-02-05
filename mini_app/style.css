@@ -298,41 +298,71 @@ body {
   color: #fff;
 }
 
-.action-btn_status {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 50%;
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  background: var(--tg-theme-secondary-bg-color, #1c1c22);
-  color: var(--tg-theme-hint-color, #a1a1aa);
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.1));
+/* Карточка статуса подписки */
+.status-card-wrap {
+  margin-bottom: 16px;
+}
+
+.status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--tg-theme-secondary-bg-color, #1a1a1f);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
   cursor: default;
 }
 
-.action-btn_status .action-btn__text {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.status-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tg-theme-hint-color, #71717a);
 }
 
+.status-card__value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #e4e4e7);
+}
 
-.action-btn_status.status_active {
+.status-card.status_card_active .status-card__value {
   color: #22c55e;
-  border-color: rgba(34, 197, 94, 0.3);
 }
 
-.action-btn_status.status_expired {
+.status-card.status_card_active {
+  border-color: rgba(34, 197, 94, 0.25);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, transparent 100%);
+}
+
+.status-card.status_card_expired .status-card__value {
   color: #f97316;
-  border-color: rgba(249, 115, 22, 0.3);
 }
 
-.action-btn_status.status_pending {
+.status-card.status_card_expired {
+  border-color: rgba(249, 115, 22, 0.25);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.05) 0%, transparent 100%);
+}
+
+.status-card.status_card_pending .status-card__value {
   color: #eab308;
-  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.status-card.status_card_pending {
+  border-color: rgba(234, 179, 8, 0.25);
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.05) 0%, transparent 100%);
+}
+
+.status-card.status_card_loading .status-card__value,
+.status-card.status_card_error .status-card__value {
+  color: var(--tg-theme-hint-color, #a1a1aa);
+}
+
+.action-btn_full {
+  flex: 1 1 100%;
+  max-width: none;
 }
 
 /* 3. Участок: Ключ доступа + кнопка «Скопировать» на всю ширину */
