@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
@@ -17,6 +17,8 @@ class Server(Base):
     active_users: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_users: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Шаблон VLESS-ссылки для этого сервера (плейсхолдер {uuid}). Если пусто — используется глобальный VLESS_URL_TEMPLATE.
+    vless_url_template: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     subscriptions = relationship("Subscription", back_populates="server")

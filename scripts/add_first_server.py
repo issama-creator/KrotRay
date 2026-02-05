@@ -22,11 +22,12 @@ def main():
     host = (os.getenv("XRAY_SERVER_HOST") or "").strip()
     grpc_port_s = (os.getenv("XRAY_GRPC_PORT") or "").strip()
     max_users_s = (os.getenv("XRAY_MAX_USERS") or "100").strip()
+    vless_template = (os.getenv("VLESS_URL_TEMPLATE") or "").strip() or None
 
     if not name or not host or not grpc_port_s:
         print(
             "Задайте в .env: XRAY_SERVER_NAME, XRAY_SERVER_HOST, XRAY_GRPC_PORT.\n"
-            "Опционально: XRAY_MAX_USERS (по умолчанию 100)."
+            "Опционально: XRAY_MAX_USERS (по умолчанию 200), VLESS_URL_TEMPLATE (шаблон ссылки с {uuid})."
         )
         sys.exit(1)
 
@@ -55,6 +56,7 @@ def main():
             grpc_port=grpc_port,
             max_users=max_users,
             enabled=True,
+            vless_url_template=vless_template,
         )
         db.add(s)
         db.commit()

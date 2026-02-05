@@ -474,12 +474,52 @@ systemctl restart krotray
    ```
    В консоли должно появиться: `Добавлен сервер: Main 127.0.0.1:8080 (max_users=100)` (или твой name/host/port). Повторный запуск не создаст дубликат по одному и тому же host:port.
 
-4. **Проверка в БД** (по желанию):
+4. **VLESS-шаблон для первого сервера:** если в `.env` задан `VLESS_URL_TEMPLATE`, скрипт сохранит его в поле `vless_url_template` у этого сервера. Тогда ссылка пользователю будет собираться из шаблона **этого сервера**, а не из глобального `.env`.
+
+5. **Проверка в БД** (по желанию):
    ```bash
    sudo -u postgres psql -d krotray -c "SELECT id, name, host, grpc_port, active_users, max_users, enabled FROM servers;"
    ```
 
 После этого при успешной оплате бэкенд будет выбирать этот сервер и создавать в нём клиента (через gRPC, если реализован вызов Xray API).
+
+### Несколько серверов (10–30)
+
+У каждого сервера в таблице `servers` есть поле **`vless_url_template`** — шаблон VLESS-ссылки с плейсхолдером `{uuid}` для **этого** сервера. При выдаче ключа пользователю используется шаблон того сервера, к которому привязана подписка (а не один общий из `.env`).
+
+**Как добавить второй, третий, … сервер:**
+
+1. В `.env` на krotray.ru поменяй переменные на данные **нового** сервера:
+   ```env
+   XRAY_SERVER_NAME=Server2
+   XRAY_SERVER_HOST=1.2.3.4
+   XRAY_GRPC_PORT=8080
+   XRAY_MAX_USERS=100
+   VLESS_URL_TEMPLATE=vless://{uuid}@1.2.3.4:443?encryption=none&flow=...&pbk=...&sid=...#KrotRay
+   ```
+2. Выполни (из корня проекта на VDS):
+   ```bash
+   python scripts/add_first_server.py
+   ```
+   (или `python scripts/add_server.py` — то же самое.) Дубликаты по `host`+`grpc_port` не создаются.
+
+3. Для следующего сервера снова поменяй `.env` и запусти скрипт.
+
+**Через SQL** (если удобнее добавлять пачкой):
+```sql
+INSERT INTO servers (name, host, grpc_port, active_users, max_users, enabled, vless_url_template)
+VALUES (
+  'Server3',
+  '5.6.7.8',
+  8080,
+  0,
+  100,
+  true,
+  'vless://{uuid}@5.6.7.8:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.apple.com&fp=chrome&pbk=...&sid=...&type=tcp#KrotRay'
+);
+```
+
+Бэкенд при оплате выбирает **наименее загруженный** сервер (`active_users` по возрастанию), создаёт там пользователя и сохраняет шаблон ссылки этого сервера в подписке — пользователь получает ссылку именно на тот сервер, куда его добавили.
 
 ### Реальный вызов Xray gRPC (AddUser / RemoveUser)
 

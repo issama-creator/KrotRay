@@ -6,17 +6,29 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sqlalchemy.orm import joinedload
+
 from api.auth import get_or_create_user, verify_init_data
 from bot.config import VLESS_URL_TEMPLATE
-from db.models import Payment, Subscription, User
+from db.models import Payment, Server, Subscription, User
 from db.session import get_session
 
 
-def build_vless_url(uuid: str | None) -> str | None:
-    """Собирает VLESS-ссылку из шаблона, подставляя UUID. Если шаблон пустой или uuid нет — None."""
-    if not uuid or not VLESS_URL_TEMPLATE:
+def build_vless_url(uuid: str | None, server: Server | None = None) -> str | None:
+    """
+    Собирает VLESS-ссылку: подставляет UUID в шаблон.
+    Если у сервера задан vless_url_template — используется он; иначе глобальный VLESS_URL_TEMPLATE.
+    """
+    if not uuid:
         return None
-    return VLESS_URL_TEMPLATE.replace("{uuid}", uuid)
+    template = None
+    if server and getattr(server, "vless_url_template", None) and (server.vless_url_template or "").strip():
+        template = (server.vless_url_template or "").strip()
+    if not template and VLESS_URL_TEMPLATE:
+        template = VLESS_URL_TEMPLATE
+    if not template:
+        return None
+    return template.replace("{uuid}", uuid)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["mini-app"])
@@ -61,13 +73,14 @@ def get_current_user(
 
 
 def get_active_subscription(db: Session, user_id: int) -> Subscription | None:
-    """Возвращает последнюю активную подписку пользователя."""
+    """Возвращает последнюю активную подписку пользователя (с загрузкой server для VLESS-ссылки)."""
     sub = db.scalars(
         select(Subscription)
         .where(Subscription.user_id == user_id)
         .where(Subscription.status.in_(["active", "expired"]))
         .order_by(Subscription.created_at.desc())
         .limit(1)
+        .options(joinedload(Subscription.server))
     ).first()
     return sub
 
@@ -119,7 +132,7 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
             "key": sub.uuid,
         }
         if sub.uuid and not is_expired:
-            sub_payload["vless_url"] = build_vless_url(sub.uuid)
+            sub_payload["vless_url"] = build_vless_url(sub.uuid, sub.server)
         else:
             sub_payload["vless_url"] = None
         response["subscription"] = sub_payload
@@ -155,5 +168,5 @@ def get_key(user: User = Depends(get_current_user), db: Session = Depends(get_db
         return {"vless_url": None, "expires_at": expires_str, "days_left": 0}
     delta = sub_expires - now
     days_left = max(0, delta.days)
-    vless_url = build_vless_url(sub.uuid)
+    vless_url = build_vless_url(sub.uuid, sub.server)
     return {"vless_url": vless_url, "expires_at": expires_str, "days_left": days_left}
