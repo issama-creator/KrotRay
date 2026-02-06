@@ -3,5 +3,6 @@
   "vless_port": 443,
   "private_key": "ICB2VEABWtA7cvfh100WfSVHqh4fZK6yXtEqj5lyukQ",
   "short_id": "568d2499",
-  "first_client_uuid": "c8e59e9b-7d1f-424f-9440-e464b2a9fdd1"
+  "first_client_uuid": "c8e59e9b-7d1f-424f-9440-e464b2a9fdd1",
+  "sni_host": "www.apple.com"
 }

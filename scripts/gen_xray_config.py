@@ -25,6 +25,7 @@ def main():
     private_key = vars_.get("private_key", "")
     short_id = vars_.get("short_id", "568d2499")
     first_client_uuid = vars_.get("first_client_uuid", "c8e59e9b-7d1f-424f-9440-e464b2a9fdd1")
+    sni_host = vars_.get("sni_host", "www.apple.com").strip() or "www.apple.com"
 
     config = {
         "log": {"loglevel": "warning"},
@@ -45,9 +46,9 @@ def main():
                     "security": "reality",
                     "realitySettings": {
                         "show": False,
-                        "dest": "www.apple.com:443",
+                        "dest": f"{sni_host}:443",
                         "xver": 0,
-                        "serverNames": ["www.apple.com"],
+                        "serverNames": [sni_host],
                         "privateKey": private_key,
                         "shortIds": [short_id]
                     }
