@@ -27,6 +27,7 @@ from db.session import SessionLocal
 def main():
     parser = argparse.ArgumentParser(description="Добавить пользователя и подписку")
     parser.add_argument("username", nargs="?", help="Username в Telegram (без @)")
+    parser.add_argument("--username", dest="username_flag", help="Username (альтернатива позиционному аргументу)")
     parser.add_argument("--telegram-id", type=int, help="telegram_id (обязательно для нового пользователя)")
     parser.add_argument("--first-name", type=str, help="Имя (для нового пользователя)")
     parser.add_argument("--days", type=int, default=0, help="Срок подписки: дней")
@@ -34,7 +35,8 @@ def main():
     parser.add_argument("--minutes", type=int, default=0, help="Срок подписки: минут")
     args = parser.parse_args()
 
-    if not args.username and not args.telegram_id:
+    username = args.username or args.username_flag
+    if not username and not args.telegram_id:
         parser.error("Укажи username или --telegram-id")
 
     if args.days == 0 and args.hours == 0 and args.minutes == 0:
@@ -43,8 +45,8 @@ def main():
     db = SessionLocal()
     try:
         user = None
-        if args.username:
-            user_row = db.execute(select(User).where(User.username == args.username)).scalar_one_or_none()
+        if username:
+            user_row = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
             if user_row:
                 user = user_row
         if not user and args.telegram_id:
@@ -56,7 +58,7 @@ def main():
             if args.telegram_id:
                 user = User(
                     telegram_id=args.telegram_id,
-                    username=args.username or None,
+                    username=username or None,
                     first_name=args.first_name or None,
                 )
                 db.add(user)
