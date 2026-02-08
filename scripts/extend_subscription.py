@@ -107,6 +107,22 @@ def main():
                 )
             ).scalar_one_or_none()
             if sub_for_reuse and sub_for_reuse.uuid and sub_for_reuse.server_id:
+                # После истечения пользователя убрали из Xray — снова добавляем тот же UUID
+                server_row = db.execute(select(Server).where(Server.id == sub_for_reuse.server_id)).scalar_one_or_none()
+                if server_row:
+                    try:
+                        add_user_to_xray(
+                            host=server_row.host,
+                            grpc_port=server_row.grpc_port,
+                            user_uuid=sub_for_reuse.uuid,
+                            email=f"user_{user.id}",
+                            inbound_tag=XRAY_INBOUND_TAG,
+                        )
+                        server_row.active_users += 1
+                        db.add(server_row)
+                    except Exception as e:
+                        print(f"Ошибка AddUser (тот же UUID): {e}")
+                        return 1
                 sub_for_reuse.status = "active"
                 sub_for_reuse.expires_at = expires_at
                 db.add(sub_for_reuse)
@@ -116,7 +132,7 @@ def main():
                 if args.hours: dur.append(f"{args.hours} ч.")
                 if args.minutes: dur.append(f"{args.minutes} мин.")
                 print(f"Подписка продлена (тот же UUID): uuid={sub_for_reuse.uuid} expires_at={expires_at}")
-                print("Ключ в личном кабинете не меняется.")
+                print("Ключ в личном кабинете не меняется — тот же ключ снова работает.")
                 return 0
 
             server = get_least_loaded_server(db)
