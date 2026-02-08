@@ -2,8 +2,10 @@
 Передобавить пользователя в Xray с limit_ip=1 (тот же UUID, ключ не меняется).
 Нужно для уже существующих юзеров, чтобы у них заработало ограничение «1 устройство».
 
-Запуск: python scripts/set_limit_ip_user.py islam_tsoro
-    или: python scripts/set_limit_ip_user.py --telegram-id 1681564465
+Запуск (из /opt/krotray с активированным venv):
+    source venv/bin/activate
+    python scripts/set_limit_ip_user.py islam_tsoro
+Или напрямую: venv/bin/python scripts/set_limit_ip_user.py islam_tsoro
 """
 import argparse
 import os
