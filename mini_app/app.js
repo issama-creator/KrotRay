@@ -170,8 +170,6 @@
       selectedTariff.tariffId = card.dataset.tariffId || (parseInt(card.dataset.months, 10) === 1 ? "1m" : "3m");
       selectedTariff.months = parseInt(card.dataset.months, 10);
       selectedTariff.price = parseInt(card.dataset.price, 10);
-      var payAmount = document.getElementById("pay-amount");
-      if (payAmount) payAmount.textContent = selectedTariff.price + " ₽";
     }
 
     function setPaymentMethod(method) {
