@@ -217,34 +217,35 @@ body {
   margin-top: 12px;
 }
 
-/* Экран «К оплате» — тот же ритм отступов, что на главном */
+/* Экран «К оплате» — UX: способ оплаты → сумма → CTA */
 .payment-screen {
-  padding: 24px 0 24px;
+  padding: 24px 0 32px;
 }
 
 .payment-screen__actions {
-  margin-top: 28px;
+  margin-top: 32px;
   padding-top: 0;
   padding-bottom: 0;
-  text-align: left;
+  text-align: center;
 }
 
 .payment-screen__tariff-line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: center;
   gap: 8px 12px;
-  margin: 0 0 16px;
+  margin: 0 0 20px;
 }
 
 .payment-screen__tariff-label {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--tg-theme-text-color, #e4e4e7);
 }
 
 .payment-screen__amount {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--tg-theme-hint-color, #71717a);
   letter-spacing: -0.02em;
@@ -277,6 +278,10 @@ body {
 
 .payment-screen__actions .btn_large {
   margin-bottom: 0;
+  width: 100%;
+  min-height: 52px;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 /* Заголовок главного экрана — слева в углу */
