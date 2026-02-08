@@ -27,6 +27,7 @@ async def main() -> None:
     # Убираем кнопку «Открыть» в списке чатов — остаётся только «Личный кабинет» в чате
     try:
         await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+        logging.info("Кнопка меню бота сброшена (кнопка «Открыть» убрана)")
     except Exception as e:
         logging.warning("Не удалось сбросить кнопку меню бота: %s", e)
 
