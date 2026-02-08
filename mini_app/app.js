@@ -60,7 +60,11 @@
     if (tariffs) tariffs.classList.toggle("screen_hidden", name !== "tariffs");
     if (payment) payment.classList.toggle("screen_hidden", name !== "payment");
     if (name === "payment") {
+      var paymentTariffEl = document.getElementById("payment-tariff");
       var paymentAmountEl = document.getElementById("payment-amount");
+      var label = selectedTariff.tariffId === "family5" ? "Family · 1 мес" :
+        (selectedTariff.months === 3 ? "3 мес" : "1 мес");
+      if (paymentTariffEl) paymentTariffEl.textContent = label;
       if (paymentAmountEl) paymentAmountEl.textContent = selectedTariff.price + " ₽";
     }
   }
@@ -174,11 +178,15 @@
       if (payAmount) payAmount.textContent = selectedTariff.price + " ₽";
     }
 
+    var HINT_SBP = "СБП — через приложение банка.";
+    var HINT_CARD = "Оплата картой — Visa, Mastercard, МИР и др.";
     function setPaymentMethod(method) {
       selectedPaymentMethod = method;
       document.querySelectorAll(".payment-method__row").forEach(function (r) {
         r.classList.toggle("payment-method__row_selected", r.dataset.method === method);
       });
+      var hint = document.getElementById("payment-hint");
+      if (hint) hint.textContent = method === "sbp" ? HINT_SBP : HINT_CARD;
     }
 
     var tariffFamily5 = document.getElementById("tariff-family5");

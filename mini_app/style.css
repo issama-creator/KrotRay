@@ -226,30 +226,58 @@ body {
   margin-top: 63px;
   padding-top: 0;
   padding-bottom: 0;
+  text-align: center;
 }
 
 .payment-screen__head {
   margin-bottom: 28px;
-  text-align: center;
+  text-align: left;
 }
 
-.payment-screen__amount-line {
+.payment-screen__tariff-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
   margin: 0;
+}
+
+.payment-screen__tariff-label {
   font-size: 16px;
   font-weight: 600;
-  color: var(--tg-theme-hint-color, #71717a);
+  color: var(--tg-theme-text-color, #e4e4e7);
 }
 
 .payment-screen__amount {
-  margin-left: 0.4em;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--tg-theme-text-color, #e4e4e7);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color, #71717a);
   letter-spacing: -0.02em;
 }
 
-.payment-screen .payment-method {
+/* Рамка «Способ оплаты» — как у тарифов */
+.payment-method-card {
+  background: var(--tg-theme-secondary-bg-color, #1c1c22);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  overflow: hidden;
   margin-bottom: 24px;
+}
+
+.payment-method-card .payment-method__label {
+  display: block;
+  margin: 0;
+  padding: 12px 16px 12px;
+  border-bottom: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
+.payment-method-card .payment-method__row {
+  padding: 12px 16px;
 }
 
 .payment-screen__hint {
@@ -257,17 +285,6 @@ body {
   font-size: 13px;
   line-height: 1.4;
   color: var(--tg-theme-hint-color, #71717a);
-}
-
-.payment-screen__vpn-hint {
-  margin: 0 0 24px;
-  padding: 12px 14px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--tg-theme-hint-color, #94a3b8);
-  background: rgba(245, 158, 11, 0.08);
-  border-left: 3px solid #f59e0b;
-  border-radius: 0 8px 8px 0;
 }
 
 .payment-screen__actions .btn_large {
@@ -577,6 +594,9 @@ body {
 
 .tariffs .section-title {
   margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color, #e4e4e7);
 }
 
 .tariffs__note {
