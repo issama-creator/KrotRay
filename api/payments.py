@@ -206,14 +206,46 @@ def webhook(request: dict, db: Session = Depends(get_db)):
         ).scalars().first()
 
         if existing and existing.expires_at and existing.expires_at.replace(tzinfo=timezone.utc) > now:
+            # Активная подписка — только продлить срок, Xray не трогаем
             base = existing.expires_at.replace(tzinfo=timezone.utc) if existing.expires_at.tzinfo is None else existing.expires_at
             expires_at = base + timedelta(days=payment.tariff_months * days_per_month)
             existing.expires_at = expires_at
             existing.status = "active"
             db.commit()
             logger.info("Subscription extended user_id=%s expires_at=%s", payment.user_id, expires_at)
+        elif existing and existing.uuid and existing.server_id:
+            # Просроченная подписка с UUID — вернуть того же пользователя в Xray (enable), продлить срок
+            server_row = db.execute(select(Server).where(Server.id == existing.server_id)).scalars().first()
+            if server_row:
+                email = f"user_{payment.user_id}"
+                try:
+                    add_user_to_xray(
+                        host=server_row.host,
+                        grpc_port=server_row.grpc_port,
+                        user_uuid=existing.uuid,
+                        email=email,
+                    )
+                    server_row.active_users += 1
+                    db.add(server_row)
+                    existing.expires_at = now + timedelta(days=payment.tariff_months * days_per_month)
+                    existing.status = "active"
+                    db.add(existing)
+                    db.commit()
+                    logger.info(
+                        "Subscription renewed (same UUID) user_id=%s uuid=%s expires_at=%s",
+                        payment.user_id, existing.uuid, existing.expires_at,
+                    )
+                except Exception as e:
+                    logger.exception("Xray AddUser (renew) failed: %s", e)
+                    db.rollback()
+            else:
+                # Сервер удалён — создаём новую подписку как для нового пользователя
+                existing = None
         else:
-            # Итерация 6.1: выбор сервера, создание клиента в Xray, сохранение uuid и server_id
+            existing = None
+
+        if existing is None:
+            # Новый пользователь или нет uuid/server_id — создать новую подписку и AddUser
             server = get_least_loaded_server(db)
             sub_uuid: str | None = None
             sub_server_id: int | None = None
