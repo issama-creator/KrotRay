@@ -216,30 +216,19 @@ body {
 
 .payment-screen__head {
   margin-bottom: 24px;
+  text-align: center;
 }
 
-.payment-screen__title {
-  margin: 0 0 12px;
-  font-size: 14px;
+.payment-screen__amount-line {
+  margin: 0;
+  font-size: 18px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-.payment-screen__amount-card {
-  padding: 16px 20px;
-  background: var(--tg-theme-secondary-bg-color, #1c1c22);
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
-  border-radius: 12px;
-}
-
 .payment-screen__amount {
-  display: block;
-  font-size: 26px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
-  letter-spacing: -0.02em;
 }
 
 .payment-screen .payment-method {
