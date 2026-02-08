@@ -178,15 +178,11 @@
       if (payAmount) payAmount.textContent = selectedTariff.price + " ₽";
     }
 
-    var HINT_SBP = "СБП — через приложение банка.";
-    var HINT_CARD = "Оплата картой — Visa, Mastercard, МИР и др.";
     function setPaymentMethod(method) {
       selectedPaymentMethod = method;
       document.querySelectorAll(".payment-method__row").forEach(function (r) {
         r.classList.toggle("payment-method__row_selected", r.dataset.method === method);
       });
-      var hint = document.getElementById("payment-hint");
-      if (hint) hint.textContent = method === "sbp" ? HINT_SBP : HINT_CARD;
     }
 
     var tariffFamily5 = document.getElementById("tariff-family5");

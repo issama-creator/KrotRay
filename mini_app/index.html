@@ -94,12 +94,6 @@
       <div class="screen screen-payment screen_hidden" id="screen-payment">
         <button type="button" class="tariffs-back" id="btn-payment-back">← Назад</button>
         <section class="payment-screen">
-          <div class="payment-screen__head">
-            <p class="payment-screen__tariff-line">
-              <span class="payment-screen__tariff-label" id="payment-tariff">1 мес</span>
-              <span class="payment-screen__amount" id="payment-amount">100 ₽</span>
-            </p>
-          </div>
           <div class="payment-method-card">
             <span class="payment-method__label">Способ оплаты</span>
             <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="payment-method-sbp">
@@ -115,10 +109,12 @@
               <span class="payment-method__radio"></span>
             </button>
           </div>
-          <p class="payment-screen__hint" id="payment-hint">СБП — через приложение банка.</p>
           <div class="payment-screen__actions">
+            <p class="payment-screen__tariff-line">
+              <span class="payment-screen__tariff-label" id="payment-tariff">1 мес</span>
+              <span class="payment-screen__amount" id="payment-amount">100 ₽</span>
+            </p>
             <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
-            <p class="payment-note">ЮKassa · карта и СБП</p>
           </div>
         </section>
       </div>
