@@ -98,18 +98,25 @@ body {
 
 /* Блок «Перейти к оплате» — опущен ещё на 15px */
 .tariffs-pay {
-  margin-top: 103px;
-  margin-bottom: 24px;
-  padding-bottom: 0;
+  margin-top: auto;
+  padding-top: 24px;
+  padding-bottom: 28px;
   text-align: center;
 }
 
 .tariffs-pay__amount {
-  margin: 0 0 24px;
+  margin: 0 0 20px;
   font-size: 22px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
   text-align: center;
+}
+
+.tariffs-pay .btn_large {
+  width: 100%;
+  min-height: 56px;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .payment-method {
@@ -211,10 +218,6 @@ body {
   color: var(--tg-theme-text-color, #e4e4e7);
 }
 
-.tariffs-pay .btn_large {
-  margin-bottom: 12px;
-}
-
 .tariffs-pay .payment-note {
   margin-top: 12px;
 }
@@ -248,20 +251,9 @@ body {
   text-align: center;
 }
 
-/* Рамка «Способ оплаты» — как у тарифов */
-.payment-method-card {
-  background: var(--tg-theme-secondary-bg-color, #1c1c22);
-  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 24px;
-}
-
-.payment-method-card .payment-method__label {
-  display: block;
-  margin: 0;
-  padding: 12px 16px 12px;
-  border-bottom: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.08));
+/* Подпись «Способ оплаты» — вне рамки */
+.payment-screen__method-label {
+  margin: 30px 0 12px;
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
@@ -269,16 +261,33 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
+/* Рамка «Способ оплаты» — как у тарифов */
+.payment-method-card {
+  background: var(--tg-theme-secondary-bg-color, #1c1c22);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
 .payment-method-card .payment-method__row {
   padding: 12px 16px;
 }
 
 .payment-screen__actions .btn_large {
-  margin-bottom: 0;
+  margin-bottom: 12px;
   width: 100%;
-  min-height: 52px;
+  min-height: 56px;
   font-size: 17px;
   font-weight: 600;
+}
+
+.payment-screen__note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--tg-theme-hint-color, #71717a);
+  text-align: center;
 }
 
 /* Заголовок главного экрана — слева в углу */
@@ -571,8 +580,12 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-/* Тарифы — сбалансированные отступы как на главном */
+/* Тарифы — контент сверху, блок «Перейти к оплате» внизу как на экране оплаты */
 .tariffs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 20px 0 0;
   margin-bottom: 0;
 }
