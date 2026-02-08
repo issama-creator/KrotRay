@@ -221,14 +221,17 @@ body {
 
 .payment-screen__amount-line {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--tg-theme-hint-color, #71717a);
 }
 
 .payment-screen__amount {
+  margin-left: 0.4em;
+  font-size: 22px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
+  letter-spacing: -0.02em;
 }
 
 .payment-screen .payment-method {
