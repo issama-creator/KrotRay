@@ -71,16 +71,6 @@ body {
 
 .screen-tariffs,
 .screen-payment {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.screen-tariffs .tariffs,
-.screen-payment .payment-screen {
-  display: flex;
-  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
@@ -104,12 +94,11 @@ body {
   opacity: 0.8;
 }
 
-/* Блок «Перейти к оплате» — прижат к низу, кнопка на 20px выше */
+/* Блок «Перейти к оплате» — тот же ритм отступов, что на главном */
 .tariffs-pay {
-  margin-top: auto;
-  padding-top: 24px;
-  margin-bottom: 0;
-  padding-bottom: 4px;
+  margin-top: 28px;
+  margin-bottom: 24px;
+  padding-bottom: 0;
   text-align: center;
 }
 
@@ -228,19 +217,19 @@ body {
   margin-top: 12px;
 }
 
-/* Экран «К оплате» — кнопка «Оплатить» в том же месте, что и «Перейти к оплате» */
+/* Экран «К оплате» — тот же ритм отступов, что на главном */
 .payment-screen {
-  padding: 16px 0 0;
+  padding: 24px 0 24px;
 }
 
 .payment-screen__actions {
-  margin-top: auto;
-  padding-top: 24px;
-  padding-bottom: 4px;
+  margin-top: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .payment-screen__head {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
   text-align: center;
 }
 
@@ -260,19 +249,19 @@ body {
 }
 
 .payment-screen .payment-method {
-  margin-bottom: 12px;
+  margin-bottom: 24px;
 }
 
 .payment-screen__hint {
-  margin: 0 0 12px;
+  margin: 0 0 20px;
   font-size: 13px;
   line-height: 1.4;
   color: var(--tg-theme-hint-color, #71717a);
 }
 
 .payment-screen__vpn-hint {
-  margin: 0 0 28px;
-  padding: 10px 12px;
+  margin: 0 0 24px;
+  padding: 12px 14px;
   font-size: 13px;
   line-height: 1.4;
   color: var(--tg-theme-hint-color, #94a3b8);
@@ -580,14 +569,18 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-/* Тарифы */
+/* Тарифы — сбалансированные отступы как на главном */
 .tariffs {
-  padding: 16px 0;
+  padding: 20px 0 0;
   margin-bottom: 0;
 }
 
+.tariffs .section-title {
+  margin-bottom: 12px;
+}
+
 .tariffs__note {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   font-size: 14px;
   color: var(--tg-theme-hint-color, #71717a);
 }
@@ -598,8 +591,8 @@ body {
 }
 
 .tariffs__note_lower {
-  margin-top: 1.25rem;
-  margin-bottom: 0.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 12px;
 }
 
 .tariff-card_spaced {
@@ -611,7 +604,7 @@ body {
   border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
   border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 4px;
+  margin-bottom: 12px;
 }
 
 .tariff-row {
