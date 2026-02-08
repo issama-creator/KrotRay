@@ -21,7 +21,7 @@
   var STATE = "NO_SUBSCRIPTION";
   var data = { subscription: null };
 
-  var selectedTariff = { months: 1, price: 100 };
+  var selectedTariff = { tariffId: "1m", months: 1, price: 100 };
   var selectedPaymentMethod = "sbp"; // "sbp" | "card"
 
   function formatDate(isoStr) {
@@ -159,6 +159,7 @@
         c.classList.remove("tariff-row_selected");
       });
       card.classList.add("tariff-row_selected");
+      selectedTariff.tariffId = card.dataset.tariffId || (parseInt(card.dataset.months, 10) === 1 ? "1m" : "3m");
       selectedTariff.months = parseInt(card.dataset.months, 10);
       selectedTariff.price = parseInt(card.dataset.price, 10);
       var payAmount = document.getElementById("pay-amount");
@@ -172,18 +173,19 @@
       });
     }
 
-    if (tariff1) {
-      tariff1.onclick = function () {
+    var tariff2d = document.getElementById("tariff-2d");
+    var tariffFamily5 = document.getElementById("tariff-family5");
+    function bindTariffRow(el) {
+      if (!el) return;
+      el.onclick = function () {
         tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
         setSelected(this);
       };
     }
-    if (tariff3) {
-      tariff3.onclick = function () {
-        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-        setSelected(this);
-      };
-    }
+    bindTariffRow(tariff1);
+    bindTariffRow(tariff3);
+    bindTariffRow(tariff2d);
+    bindTariffRow(tariffFamily5);
 
     if (btnBuyKeyTop) {
       btnBuyKeyTop.onclick = function () {
@@ -215,7 +217,7 @@
     if (btnPay) {
       btnPay.onclick = function () {
         tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
-        var tariffId = selectedTariff.months === 1 ? "1m" : "3m";
+        var tariffId = selectedTariff.tariffId || (selectedTariff.months === 1 ? "1m" : "3m");
         var initData = tg.initData || "";
         btnPay.disabled = true;
         fetch(apiBase + "/api/payments/create", {

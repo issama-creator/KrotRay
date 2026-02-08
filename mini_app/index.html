@@ -59,19 +59,37 @@
         <button type="button" class="tariffs-back" id="btn-tariffs-back">← Назад</button>
         <section class="tariffs">
           <h2 class="section-title">Тарифы</h2>
-          <p class="tariffs__note">Подписка · 1 устройство</p>
+          <p class="tariffs__note">1 ключ · 1 устройство</p>
           <div class="tariff-card">
-            <button type="button" class="tariff-row tariff-row_selected" data-months="1" data-price="100" id="tariff-1">
+            <button type="button" class="tariff-row tariff-row_selected" data-tariff-id="1m" data-months="1" data-price="100" id="tariff-1">
               <span class="tariff-row__period">1 месяц</span>
               <span class="tariff-row__price">100 ₽</span>
               <span class="tariff-row__radio"></span>
             </button>
-            <button type="button" class="tariff-row" data-months="3" data-price="250" id="tariff-3">
+            <button type="button" class="tariff-row" data-tariff-id="3m" data-months="3" data-price="250" id="tariff-3">
               <span class="tariff-row__info">
                 <span class="tariff-row__period">3 месяца</span>
                 <span class="tariff-row__savings">Экономия <span class="tariff-savings__amount">50 ₽</span></span>
               </span>
               <span class="tariff-row__price">250 ₽</span>
+              <span class="tariff-row__radio"></span>
+            </button>
+          </div>
+          <div class="tariff-card tariff-card_spaced">
+            <button type="button" class="tariff-row" data-tariff-id="2d" data-months="1" data-price="180" id="tariff-2d">
+              <span class="tariff-row__info">
+                <span class="tariff-row__period">до 2 устройств</span>
+                <span class="tariff-row__meta">1 мес</span>
+              </span>
+              <span class="tariff-row__price">180 ₽</span>
+              <span class="tariff-row__radio"></span>
+            </button>
+            <button type="button" class="tariff-row" data-tariff-id="family5" data-months="1" data-price="500" id="tariff-family5">
+              <span class="tariff-row__info">
+                <span class="tariff-row__period">Family · до 5 устройств</span>
+                <span class="tariff-row__meta">1 мес</span>
+              </span>
+              <span class="tariff-row__price">500 ₽</span>
               <span class="tariff-row__radio"></span>
             </button>
           </div>

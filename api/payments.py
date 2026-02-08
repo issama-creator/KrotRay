@@ -18,7 +18,12 @@ from db.session import get_session
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["payments"])
 
-TARIFFS = {"1m": (1, 100), "3m": (3, 250)}  # tariff_id -> (months, amount_rub)
+TARIFFS = {
+    "1m": (1, 100),       # 1 ключ · 1 устройство
+    "3m": (3, 250),
+    "2d": (1, 180),       # до 2 устройств, 1 мес
+    "family5": (1, 500), # Family · до 5 устройств, 1 мес
+}  # tariff_id -> (months, amount_rub)
 
 
 def get_db():
@@ -53,7 +58,7 @@ def get_current_user(
 
 
 class CreatePaymentRequest(BaseModel):
-    tariff: str  # "1m" | "3m"
+    tariff: str  # "1m" | "3m" | "2d" | "family5"
     method: str  # "sbp" | "card"
 
 

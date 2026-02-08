@@ -497,6 +497,10 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
+.tariff-card_spaced {
+  margin-top: 1.25rem;
+}
+
 .tariff-card {
   background: var(--tg-theme-secondary-bg-color, #1c1c22);
   border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
@@ -571,6 +575,12 @@ body {
 .tariff-row__savings .tariff-savings__amount {
   color: #3b82f6;
   font-weight: 600;
+}
+
+.tariff-row__meta {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tg-theme-hint-color, #71717a);
 }
 
 /* Первый тариф (1 месяц) — период без обёртки info */
