@@ -19,6 +19,7 @@ async def cmd_start(message: Message) -> None:
         logging.warning("Сброс кнопки меню: %s", e)
 
     await message.answer(
-        "Добро пожаловать в KrotRay! Нажмите кнопку ниже, чтобы открыть личный кабинет.",
+        "⚠️ Ведутся технические работы. Бот временно не работает.\n\n"
+        "Приносим извинения за неудобства. Скоро всё заработает.",
         reply_markup=get_main_keyboard(MINI_APP_URL, API_URL),
     )
