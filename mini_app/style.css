@@ -49,6 +49,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--tg-theme-hint-color, #71717a);
+  text-align: center;
 }
 
 .content {
@@ -495,7 +496,6 @@ body {
   margin: 0 0 12px;
   font-size: 14px;
   color: var(--tg-theme-hint-color, #71717a);
-  text-align: center;
 }
 
 .tariffs__note_lower {
