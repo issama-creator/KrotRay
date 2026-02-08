@@ -234,13 +234,10 @@ body {
 .payment-screen__to-pay {
   margin: 0 0 24px;
   text-align: center;
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
   letter-spacing: -0.02em;
-}
-
-.payment-screen__to-pay-amount {
   white-space: nowrap;
 }
 
@@ -273,6 +270,26 @@ body {
 
 .payment-method-card .payment-method__row {
   padding: 12px 16px;
+}
+
+.payment-screen__info {
+  margin-bottom: 24px;
+}
+
+.payment-screen__hint-text {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tg-theme-hint-color, #71717a);
+  text-align: center;
+}
+
+.payment-screen__support {
+  margin: 0;
+  font-size: 12px;
+  color: var(--tg-theme-hint-color, #71717a);
+  text-align: left;
+  opacity: 0.85;
 }
 
 .payment-screen__actions .btn_large {
