@@ -49,7 +49,6 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--tg-theme-hint-color, #71717a);
-  text-align: center;
 }
 
 .content {
