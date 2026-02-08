@@ -113,6 +113,12 @@ body {
   text-align: center;
 }
 
+.tariffs-pay__amount-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
 /* Кнопка «Перейти к оплате» внизу */
 .tariffs-pay-actions {
   padding-top: 24px;
@@ -242,26 +248,16 @@ body {
 .payment-screen__to-pay {
   margin: 0 0 24px;
   text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color, #e4e4e7);
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
-.payment-screen__to-pay-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--tg-theme-hint-color, #71717a);
-}
-
-.payment-screen__to-pay-amount {
-  margin-left: 0.35em;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--tg-theme-text-color, #e4e4e7);
-}
-
 .payment-screen__actions {
   margin-top: auto;
-  padding-top: 24px;
+  padding-top: 0;
   padding-bottom: 28px;
   text-align: center;
 }
@@ -290,16 +286,20 @@ body {
   padding: 12px 16px;
 }
 
+/* Подпись над кнопкой «Оплатить» — как «Способ оплаты» над карточкой */
 .payment-screen__info {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
+  text-align: left;
 }
 
 .payment-screen__hint-text {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 13px;
-  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: var(--tg-theme-hint-color, #71717a);
   text-align: left;
+  line-height: 1.4;
 }
 
 .payment-screen__actions .btn_large {
