@@ -497,8 +497,13 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-.tariff-card_spaced {
+.tariffs__note_lower {
   margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.tariff-card_spaced {
+  margin-top: 0;
 }
 
 .tariff-card {
