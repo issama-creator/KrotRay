@@ -94,9 +94,9 @@ body {
   opacity: 0.8;
 }
 
-/* Блок «Перейти к оплате» — опущен на 20px ниже */
+/* Блок «Перейти к оплате» — опущен ещё на 15px */
 .tariffs-pay {
-  margin-top: 48px;
+  margin-top: 63px;
   margin-bottom: 24px;
   padding-bottom: 0;
   text-align: center;
@@ -223,7 +223,7 @@ body {
 }
 
 .payment-screen__actions {
-  margin-top: 48px;
+  margin-top: 63px;
   padding-top: 0;
   padding-bottom: 0;
 }
