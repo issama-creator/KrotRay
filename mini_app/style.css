@@ -209,64 +209,59 @@ body {
   margin-top: 12px;
 }
 
-/* Экран «Оплата» (способ оплаты, как Hit VPN; стиль как у наших экранов) */
+/* Экран «К оплате» — своя компоновка, не как Hit VPN */
 .payment-screen {
   padding: 16px 0;
 }
 
-.payment-screen__title {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--tg-theme-text-color, #e4e4e7);
-  text-align: center;
+.payment-screen__head {
+  margin-bottom: 24px;
 }
 
-.payment-screen__amount-label {
-  margin: 0 0 4px;
-  font-size: 13px;
-  font-weight: 500;
+.payment-screen__title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--tg-theme-hint-color, #71717a);
-  text-align: center;
+}
+
+.payment-screen__amount-card {
+  padding: 16px 20px;
+  background: var(--tg-theme-secondary-bg-color, #1c1c22);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
 }
 
 .payment-screen__amount {
-  margin: 0 0 24px;
-  font-size: 28px;
+  display: block;
+  font-size: 26px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
-  text-align: center;
+  letter-spacing: -0.02em;
 }
 
 .payment-screen .payment-method {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.payment-screen__sbp-info {
-  margin: 0 0 16px;
+.payment-screen__hint {
+  margin: 0 0 12px;
   font-size: 13px;
   line-height: 1.4;
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-.payment-screen__vpn-warning {
+.payment-screen__vpn-hint {
   margin: 0 0 20px;
-  padding: 12px;
-  background: rgba(220, 38, 38, 0.12);
-  border-radius: 8px;
-  border: 1px solid rgba(220, 38, 38, 0.3);
-}
-
-.payment-screen__vpn-warning p {
-  margin: 0 0 4px;
+  padding: 10px 12px;
   font-size: 13px;
-  font-weight: 600;
-  color: #f87171;
-  line-height: 1.35;
-}
-
-.payment-screen__vpn-warning p:last-child {
-  margin-bottom: 0;
+  line-height: 1.4;
+  color: var(--tg-theme-hint-color, #94a3b8);
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 8px 8px 0;
 }
 
 .payment-screen .btn_large {

@@ -90,15 +90,18 @@
         </section>
       </div>
 
-      <!-- Экран 3: Оплата (способ оплаты, как у Hit VPN) -->
+      <!-- Экран 3: К оплате (своя компоновка, не как Hit VPN) -->
       <div class="screen screen-payment screen_hidden" id="screen-payment">
         <button type="button" class="tariffs-back" id="btn-payment-back">← Назад</button>
         <section class="payment-screen">
-          <h2 class="payment-screen__title">Оплата</h2>
-          <p class="payment-screen__amount-label">Сумма к оплате</p>
-          <p class="payment-screen__amount" id="payment-amount">100 ₽</p>
+          <div class="payment-screen__head">
+            <p class="payment-screen__title">К оплате</p>
+            <div class="payment-screen__amount-card">
+              <span class="payment-screen__amount" id="payment-amount">100 ₽</span>
+            </div>
+          </div>
           <div class="payment-method">
-            <span class="payment-method__label">Выберите способ оплаты:</span>
+            <span class="payment-method__label">Способ оплаты</span>
             <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="payment-method-sbp">
               <span class="payment-method__icon payment-method__icon_sbp" aria-hidden="true">
                 <span class="icon-sbp"></span>
@@ -108,17 +111,16 @@
             </button>
             <button type="button" class="payment-method__row" data-method="card" id="payment-method-card">
               <span class="payment-method__icon payment-method__icon_card" aria-hidden="true"></span>
-              <span class="payment-method__text">Оплата картой</span>
+              <span class="payment-method__text">Картой</span>
               <span class="payment-method__radio"></span>
             </button>
           </div>
-          <p class="payment-screen__sbp-info">Для оплаты через СБП требуется, чтобы у вас было установлено приложение банка.</p>
-          <div class="payment-screen__vpn-warning">
-            <p>Не забудьте отключить VPN перед оплатой!</p>
-            <p>Некоторые банки не работают с включенным VPN.</p>
+          <p class="payment-screen__hint">СБП — через приложение банка.</p>
+          <div class="payment-screen__vpn-hint">
+            Перед оплатой отключите VPN: с ним платёж может не пройти.
           </div>
           <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
-          <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
+          <p class="payment-note">ЮKassa · карта и СБП</p>
         </section>
       </div>
     </main>
