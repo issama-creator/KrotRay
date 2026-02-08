@@ -104,12 +104,13 @@ body {
   opacity: 0.8;
 }
 
-/* Блок «Перейти к оплате» — прижат к низу, как и «Оплатить» на экране оплаты */
+/* Блок «Перейти к оплате» — прижат к низу, кнопка на 20px выше */
 .tariffs-pay {
   margin-top: auto;
   padding-top: 24px;
   margin-bottom: 0;
-  padding-bottom: 24px;
+  padding-bottom: 4px;
+  text-align: center;
 }
 
 .tariffs-pay__amount {
@@ -235,7 +236,7 @@ body {
 .payment-screen__actions {
   margin-top: auto;
   padding-top: 24px;
-  padding-bottom: 24px;
+  padding-bottom: 4px;
 }
 
 .payment-screen__head {
