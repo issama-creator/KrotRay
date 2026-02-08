@@ -105,7 +105,7 @@ body {
 }
 
 .tariffs-pay__amount {
-  margin: 0 0 20px;
+  margin: 0 0 32px;
   font-size: 22px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
@@ -580,13 +580,13 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
-/* Тарифы — контент сверху, блок «Перейти к оплате» внизу как на экране оплаты */
+/* Тарифы — контент чуть ниже, блок «Перейти к оплате» внизу как на экране оплаты */
 .tariffs {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 20px 0 0;
+  padding: 44px 0 0;
   margin-bottom: 0;
 }
 
