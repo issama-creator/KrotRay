@@ -173,7 +173,6 @@
       });
     }
 
-    var tariff2d = document.getElementById("tariff-2d");
     var tariffFamily5 = document.getElementById("tariff-family5");
     function bindTariffRow(el) {
       if (!el) return;
@@ -184,7 +183,6 @@
     }
     bindTariffRow(tariff1);
     bindTariffRow(tariff3);
-    bindTariffRow(tariff2d);
     bindTariffRow(tariffFamily5);
 
     if (btnBuyKeyTop) {

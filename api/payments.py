@@ -21,8 +21,7 @@ router = APIRouter(tags=["payments"])
 TARIFFS = {
     "1m": (1, 100),       # 1 ключ · 1 устройство
     "3m": (3, 250),
-    "2d": (1, 180),       # до 2 устройств, 1 мес
-    "family5": (1, 500), # Family · до 5 устройств, 1 мес
+    "family5": (1, 500),  # до 5 устройств, 1 мес
 }  # tariff_id -> (months, amount_rub)
 
 
@@ -58,7 +57,7 @@ def get_current_user(
 
 
 class CreatePaymentRequest(BaseModel):
-    tariff: str  # "1m" | "3m" | "2d" | "family5"
+    tariff: str  # "1m" | "3m" | "family5"
     method: str  # "sbp" | "card"
 
 
