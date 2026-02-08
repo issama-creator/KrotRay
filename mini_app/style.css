@@ -69,6 +69,22 @@ body {
   display: none !important;
 }
 
+.screen-tariffs,
+.screen-payment {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.screen-tariffs .tariffs,
+.screen-payment .payment-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 /* Кнопка «Назад» на экране тарифов */
 .tariffs-back {
   display: inline-flex;
@@ -88,14 +104,16 @@ body {
   opacity: 0.8;
 }
 
-/* Блок «Оплатить» на экране тарифов */
+/* Блок «Перейти к оплате» — прижат к низу, как и «Оплатить» на экране оплаты */
 .tariffs-pay {
-  margin-top: 24px;
-  margin-bottom: 16px;
+  margin-top: auto;
+  padding-top: 24px;
+  margin-bottom: 0;
+  padding-bottom: 24px;
 }
 
 .tariffs-pay__amount {
-  margin: 0 0 16px;
+  margin: 0 0 24px;
   font-size: 22px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #e4e4e7);
@@ -209,9 +227,15 @@ body {
   margin-top: 12px;
 }
 
-/* Экран «К оплате» — своя компоновка, не как Hit VPN */
+/* Экран «К оплате» — кнопка «Оплатить» в том же месте, что и «Перейти к оплате» */
 .payment-screen {
-  padding: 16px 0;
+  padding: 16px 0 0;
+}
+
+.payment-screen__actions {
+  margin-top: auto;
+  padding-top: 24px;
+  padding-bottom: 24px;
 }
 
 .payment-screen__head {
@@ -246,7 +270,7 @@ body {
 }
 
 .payment-screen__vpn-hint {
-  margin: 0 0 20px;
+  margin: 0 0 28px;
   padding: 10px 12px;
   font-size: 13px;
   line-height: 1.4;
@@ -256,12 +280,13 @@ body {
   border-radius: 0 8px 8px 0;
 }
 
-.payment-screen .btn_large {
+.payment-screen__actions .btn_large {
   margin-bottom: 12px;
 }
 
-.payment-screen .payment-note {
+.payment-screen__actions .payment-note {
   margin-top: 12px;
+  margin-bottom: 0;
 }
 
 /* Заголовок главного экрана — слева в углу */
