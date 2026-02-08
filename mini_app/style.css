@@ -498,6 +498,11 @@ body {
   color: var(--tg-theme-hint-color, #71717a);
 }
 
+.tariff-note__digit {
+  color: #22c55e;
+  font-weight: 700;
+}
+
 .tariffs__note_lower {
   margin-top: 1.25rem;
   margin-bottom: 0.5rem;
