@@ -277,8 +277,6 @@
           return;
         }
         tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
-        input.select();
-        input.setSelectionRange(0, 99999);
         try {
           navigator.clipboard.writeText(input.value);
           showToast("Ключ скопирован");
