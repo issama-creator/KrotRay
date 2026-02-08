@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from db.models import Payment, Subscription, User
 from db.session import SessionLocal
 
@@ -53,16 +53,52 @@ def main():
                 print(f"  {p.created_at}  telegram_id={u.telegram_id}  @{u.username or '-'}  {u.first_name or '-'}  {p.amount} ₽  {p.tariff_months} мес.")
             return
 
-        # Без периода: последние платежи и подписки
+        # Без периода: сводка по подпискам и последние платежи/подписки
+        total = db.execute(select(func.count(Subscription.id))).scalar() or 0
+        active = db.execute(select(func.count(Subscription.id)).where(Subscription.status == "active")).scalar() or 0
+        expired = db.execute(select(func.count(Subscription.id)).where(Subscription.status == "expired")).scalar() or 0
+
+        def _dt(d):
+            if d is None:
+                return "-"
+            return d.strftime("%Y-%m-%d %H:%M") if hasattr(d, "strftime") else str(d)
+
+        # Сводка подписок — таблица
+        print("┌" + "─" * 42 + "┐")
+        print("│  ПОДПИСКИ (сводка)" + " " * 22 + "│")
+        print("├" + "─" * 42 + "┤")
+        print(f"│  Всего подписок:   {total:>6}              │")
+        print(f"│  Активных:         {active:>6}              │")
+        print(f"│  Просроченных:     {expired:>6}              │")
+        print("└" + "─" * 42 + "┘")
+        print()
+
         payments = db.execute(
             select(Payment, User)
             .join(User, Payment.user_id == User.id)
             .order_by(desc(Payment.created_at))
             .limit(30)
         ).all()
-        print("=== Последние платежи (payments) ===")
+
+        # Таблица платежей
+        w_date = 16
+        w_tg = 14
+        w_user = 14
+        w_sum = 8
+        w_status = 12
+        w_tariff = 6
+        sep_len = w_date + w_tg + w_user + w_sum + w_status + w_tariff + 12
+        sep = "─" * sep_len
+        print("┌" + sep + "┐")
+        print("│  ПОСЛЕДНИЕ ПЛАТЕЖИ" + " " * (sep_len - 21) + "│")
+        print("├" + "─" * w_date + "┬" + "─" * w_tg + "┬" + "─" * w_user + "┬" + "─" * w_sum + "┬" + "─" * w_status + "┬" + "─" * w_tariff + "┤")
+        print(f"│  {'Дата':<{w_date-2}} │ {'telegram_id':<{w_tg-2}} │ {'username':<{w_user-2}} │ {'Сумма':<{w_sum-2}} │ {'Статус':<{w_status-2}} │ {'Тариф':<{w_tariff-2}} │")
+        print("├" + "─" * w_date + "┼" + "─" * w_tg + "┼" + "─" * w_user + "┼" + "─" * w_sum + "┼" + "─" * w_status + "┼" + "─" * w_tariff + "┤")
         for p, u in payments:
-            print(f"  {p.created_at}  telegram_id={u.telegram_id}  @{u.username or '-'}  {p.amount}  status={p.status}  tariff={p.tariff_months} мес.")
+            user = f"@{u.username or '-'}"[: w_user - 2]
+            print(f"│  {_dt(p.created_at):<{w_date-2}} │ {str(u.telegram_id):<{w_tg-2}} │ {user:<{w_user-2}} │ {str(p.amount):<{w_sum-2}} │ {p.status:<{w_status-2}} │ {str(p.tariff_months):<{w_tariff-2}} │")
+        print("└" + "─" * w_date + "┴" + "─" * w_tg + "┴" + "─" * w_user + "┴" + "─" * w_sum + "┴" + "─" * w_status + "┴" + "─" * w_tariff + "┘")
+        print()
 
         subs = db.execute(
             select(Subscription, User)
@@ -70,9 +106,22 @@ def main():
             .order_by(desc(Subscription.created_at))
             .limit(30)
         ).all()
-        print("\n=== Последние подписки (subscriptions) ===")
+
+        # Таблица подписок
+        w_uuid = 38
+        w_exp = 16
+        sep2_len = w_date + w_tg + w_user + w_uuid + w_status + w_exp + 12
+        sep2 = "─" * sep2_len
+        print("┌" + sep2 + "┐")
+        print("│  ПОСЛЕДНИЕ ПОДПИСКИ" + " " * (sep2_len - 22) + "│")
+        print("├" + "─" * w_date + "┬" + "─" * w_tg + "┬" + "─" * w_user + "┬" + "─" * w_uuid + "┬" + "─" * w_status + "┬" + "─" * w_exp + "┤")
+        print(f"│  {'Дата':<{w_date-2}} │ {'telegram_id':<{w_tg-2}} │ {'username':<{w_user-2}} │ {'uuid':<{w_uuid-2}} │ {'Статус':<{w_status-2}} │ {'Истекает':<{w_exp-2}} │")
+        print("├" + "─" * w_date + "┼" + "─" * w_tg + "┼" + "─" * w_user + "┼" + "─" * w_uuid + "┼" + "─" * w_status + "┼" + "─" * w_exp + "┤")
         for s, u in subs:
-            print(f"  {s.created_at}  telegram_id={u.telegram_id}  @{u.username or '-'}  uuid={s.uuid or '-'}  status={s.status}  expires={s.expires_at}")
+            user = f"@{u.username or '-'}"[: w_user - 2]
+            uuid_short = (s.uuid or "-")[: w_uuid - 2] if s.uuid else "-"
+            print(f"│  {_dt(s.created_at):<{w_date-2}} │ {str(u.telegram_id):<{w_tg-2}} │ {user:<{w_user-2}} │ {uuid_short:<{w_uuid-2}} │ {s.status:<{w_status-2}} │ {_dt(s.expires_at):<{w_exp-2}} │")
+        print("└" + "─" * w_date + "┴" + "─" * w_tg + "┴" + "─" * w_user + "┴" + "─" * w_uuid + "┴" + "─" * w_status + "┴" + "─" * w_exp + "┘")
     finally:
         db.close()
 
