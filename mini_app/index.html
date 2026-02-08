@@ -94,6 +94,7 @@
       <div class="screen screen-payment screen_hidden" id="screen-payment">
         <button type="button" class="tariffs-back" id="btn-payment-back">← Назад</button>
         <section class="payment-screen">
+          <p class="payment-screen__to-pay">К оплате <span class="payment-screen__to-pay-amount" id="payment-amount">100 ₽</span></p>
           <div class="payment-method-card">
             <span class="payment-method__label">Способ оплаты</span>
             <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="payment-method-sbp">
@@ -110,10 +111,6 @@
             </button>
           </div>
           <div class="payment-screen__actions">
-            <p class="payment-screen__tariff-line">
-              <span class="payment-screen__tariff-label" id="payment-tariff">1 мес</span>
-              <span class="payment-screen__amount" id="payment-amount">100 ₽</span>
-            </p>
             <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
           </div>
         </section>

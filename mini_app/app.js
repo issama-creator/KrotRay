@@ -60,12 +60,8 @@
     if (tariffs) tariffs.classList.toggle("screen_hidden", name !== "tariffs");
     if (payment) payment.classList.toggle("screen_hidden", name !== "payment");
     if (name === "payment") {
-      var paymentTariffEl = document.getElementById("payment-tariff");
-      var paymentAmountEl = document.getElementById("payment-amount");
-      var label = selectedTariff.tariffId === "family5" ? "Family · 1 мес" :
-        (selectedTariff.months === 3 ? "3 мес" : "1 мес");
-      if (paymentTariffEl) paymentTariffEl.textContent = label;
-      if (paymentAmountEl) paymentAmountEl.textContent = selectedTariff.price + " ₽";
+      var el = document.getElementById("payment-amount");
+      if (el) el.textContent = selectedTariff.price + " ₽";
     }
   }
 
