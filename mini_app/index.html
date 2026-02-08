@@ -85,22 +85,40 @@
           </div>
           <div class="tariffs-pay">
             <p class="tariffs-pay__amount" id="pay-amount">100 ₽</p>
-            <div class="payment-method">
-              <span class="payment-method__label">Способ оплаты</span>
-              <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="method-sbp">
-                <span class="payment-method__icon payment-method__icon_sbp" aria-hidden="true"></span>
-                <span class="payment-method__text">СБП</span>
-                <span class="payment-method__radio"></span>
-              </button>
-              <button type="button" class="payment-method__row" data-method="card" id="method-card">
-                <span class="payment-method__icon payment-method__icon_card" aria-hidden="true"></span>
-                <span class="payment-method__text">Оплата картой</span>
-                <span class="payment-method__radio"></span>
-              </button>
-            </div>
-            <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
-            <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
+            <button type="button" class="btn btn_primary btn_large" id="btn-tariffs-next">Перейти к оплате</button>
           </div>
+        </section>
+      </div>
+
+      <!-- Экран 3: Оплата (способ оплаты, как у Hit VPN) -->
+      <div class="screen screen-payment screen_hidden" id="screen-payment">
+        <button type="button" class="tariffs-back" id="btn-payment-back">← Назад</button>
+        <section class="payment-screen">
+          <h2 class="payment-screen__title">Оплата</h2>
+          <p class="payment-screen__amount-label">Сумма к оплате</p>
+          <p class="payment-screen__amount" id="payment-amount">100 ₽</p>
+          <div class="payment-method">
+            <span class="payment-method__label">Выберите способ оплаты:</span>
+            <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="payment-method-sbp">
+              <span class="payment-method__icon payment-method__icon_sbp" aria-hidden="true">
+                <span class="icon-sbp"></span>
+              </span>
+              <span class="payment-method__text">СБП</span>
+              <span class="payment-method__radio"></span>
+            </button>
+            <button type="button" class="payment-method__row" data-method="card" id="payment-method-card">
+              <span class="payment-method__icon payment-method__icon_card" aria-hidden="true"></span>
+              <span class="payment-method__text">Оплата картой</span>
+              <span class="payment-method__radio"></span>
+            </button>
+          </div>
+          <p class="payment-screen__sbp-info">Для оплаты через СБП требуется, чтобы у вас было установлено приложение банка.</p>
+          <div class="payment-screen__vpn-warning">
+            <p>Не забудьте отключить VPN перед оплатой!</p>
+            <p>Некоторые банки не работают с включенным VPN.</p>
+          </div>
+          <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
+          <p class="payment-note">Оплата через ЮKassa · Карта / СБП</p>
         </section>
       </div>
     </main>

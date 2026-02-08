@@ -147,7 +147,20 @@ body {
 }
 
 .payment-method__icon_sbp {
-  background: linear-gradient(135deg, #00c853 0%, #00e676 25%, #ffab00 50%, #ff6d00 75%, #2962ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+/* Иконка СБП — многоцветная геометрия */
+.icon-sbp {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 25%, #059669 45%, #dc2626 65%, #ea580c 85%, #eab308 100%);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  border-radius: 4px;
 }
 
 .payment-method__icon_card {
@@ -193,6 +206,74 @@ body {
 }
 
 .tariffs-pay .payment-note {
+  margin-top: 12px;
+}
+
+/* Экран «Оплата» (способ оплаты, как Hit VPN; стиль как у наших экранов) */
+.payment-screen {
+  padding: 16px 0;
+}
+
+.payment-screen__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color, #e4e4e7);
+  text-align: center;
+}
+
+.payment-screen__amount-label {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tg-theme-hint-color, #71717a);
+  text-align: center;
+}
+
+.payment-screen__amount {
+  margin: 0 0 24px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--tg-theme-text-color, #e4e4e7);
+  text-align: center;
+}
+
+.payment-screen .payment-method {
+  margin-bottom: 16px;
+}
+
+.payment-screen__sbp-info {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tg-theme-hint-color, #71717a);
+}
+
+.payment-screen__vpn-warning {
+  margin: 0 0 20px;
+  padding: 12px;
+  background: rgba(220, 38, 38, 0.12);
+  border-radius: 8px;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.payment-screen__vpn-warning p {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f87171;
+  line-height: 1.35;
+}
+
+.payment-screen__vpn-warning p:last-child {
+  margin-bottom: 0;
+}
+
+.payment-screen .btn_large {
+  margin-bottom: 12px;
+}
+
+.payment-screen .payment-note {
   margin-top: 12px;
 }
 

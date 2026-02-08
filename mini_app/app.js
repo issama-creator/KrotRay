@@ -55,8 +55,14 @@
   function showScreen(name) {
     var main = document.getElementById("screen-main");
     var tariffs = document.getElementById("screen-tariffs");
+    var payment = document.getElementById("screen-payment");
     if (main) main.classList.toggle("screen_hidden", name !== "main");
     if (tariffs) tariffs.classList.toggle("screen_hidden", name !== "tariffs");
+    if (payment) payment.classList.toggle("screen_hidden", name !== "payment");
+    if (name === "payment") {
+      var paymentAmountEl = document.getElementById("payment-amount");
+      if (paymentAmountEl) paymentAmountEl.textContent = selectedTariff.price + " ₽";
+    }
   }
 
   function render() {
@@ -151,6 +157,8 @@
     var tariff3 = document.getElementById("tariff-3");
     var btnBuyKeyTop = document.getElementById("btn-buy-key-top");
     var btnTariffsBack = document.getElementById("btn-tariffs-back");
+    var btnTariffsNext = document.getElementById("btn-tariffs-next");
+    var btnPaymentBack = document.getElementById("btn-payment-back");
     var btnPay = document.getElementById("btn-pay");
     var btnCopy = document.getElementById("btn-copy");
 
@@ -197,20 +205,33 @@
         showScreen("main");
       };
     }
+    if (btnTariffsNext) {
+      btnTariffsNext.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+        showScreen("payment");
+      };
+    }
+    if (btnPaymentBack) {
+      btnPaymentBack.onclick = function () {
+        tg.HapticFeedback && tg.HapticFeedback.impactOccurred("light");
+        showScreen("tariffs");
+      };
+    }
     var methodSbp = document.getElementById("method-sbp");
     var methodCard = document.getElementById("method-card");
-    if (methodSbp) {
-      methodSbp.onclick = function () {
+    var paymentMethodSbp = document.getElementById("payment-method-sbp");
+    var paymentMethodCard = document.getElementById("payment-method-card");
+    function bindPaymentMethodRow(el, method) {
+      if (!el) return;
+      el.onclick = function () {
         tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-        setPaymentMethod("sbp");
+        setPaymentMethod(method);
       };
     }
-    if (methodCard) {
-      methodCard.onclick = function () {
-        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-        setPaymentMethod("card");
-      };
-    }
+    if (methodSbp) bindPaymentMethodRow(methodSbp, "sbp");
+    if (methodCard) bindPaymentMethodRow(methodCard, "card");
+    if (paymentMethodSbp) bindPaymentMethodRow(paymentMethodSbp, "sbp");
+    if (paymentMethodCard) bindPaymentMethodRow(paymentMethodCard, "card");
 
     if (btnPay) {
       btnPay.onclick = function () {
