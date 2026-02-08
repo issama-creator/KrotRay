@@ -22,7 +22,6 @@ def add_user_to_xray(
     user_uuid: str,
     email: str,
     inbound_tag: str | None = None,
-    limit_ip: int = 1,
 ) -> bool:
     """
     Добавляет клиента во inbound Xray через gRPC (HandlerService.AlterInbound + AddUserOperation).
@@ -32,13 +31,12 @@ def add_user_to_xray(
     :param user_uuid: UUID клиента (VLESS)
     :param email: email/идентификатор клиента (например user_id)
     :param inbound_tag: тег inbound (по умолчанию из XRAY_INBOUND_TAG)
-    :param limit_ip: макс. одновременных подключений (1 = одно устройство)
     :return: True при успехе
     :raises Exception: при ошибке gRPC
     """
     tag = inbound_tag or XRAY_INBOUND_TAG
     try:
-        _add_user_grpc(host, grpc_port, user_uuid, email, tag, limit_ip=limit_ip)
+        _add_user_grpc(host, grpc_port, user_uuid, email, tag)
         return True
     except ImportError as e:
         logger.warning(
@@ -88,7 +86,6 @@ def _add_user_grpc(
     user_uuid: str,
     email: str,
     inbound_tag: str,
-    limit_ip: int = 1,
 ) -> None:
     _ensure_grpc_gen_path()
     import grpc
@@ -108,7 +105,7 @@ def _add_user_grpc(
         type="xray.proxy.vless.Account",
         value=vless_account.SerializeToString(),
     )
-    user = user_pb2.User(level=0, email=email, account=account_typed, limit_ip=limit_ip)
+    user = user_pb2.User(level=0, email=email, account=account_typed)
     add_op = command_pb2.AddUserOperation(user=user)
     op_typed = typed_message_pb2.TypedMessage(
         type="xray.app.proxyman.command.AddUserOperation",

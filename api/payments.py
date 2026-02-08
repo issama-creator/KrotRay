@@ -224,7 +224,6 @@ def webhook(request: dict, db: Session = Depends(get_db)):
                         grpc_port=server_row.grpc_port,
                         user_uuid=existing.uuid,
                         email=email,
-                        limit_ip=1,
                     )
                     server_row.active_users += 1
                     db.add(server_row)
@@ -259,7 +258,6 @@ def webhook(request: dict, db: Session = Depends(get_db)):
                         grpc_port=server.grpc_port,
                         user_uuid=sub_uuid,
                         email=email,
-                        limit_ip=1,
                     )
                     sub_server_id = server.id
                     server.active_users += 1
