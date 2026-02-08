@@ -7,6 +7,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(name)s: %(messa
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonDefault
 
 from bot.config import API_URL, BOT_TOKEN
 from bot.handlers import router
@@ -22,6 +23,12 @@ async def main() -> None:
     )
     dp = Dispatcher()
     dp.include_router(router)
+
+    # Убираем кнопку «Открыть» в списке чатов — остаётся только «Личный кабинет» в чате
+    try:
+        await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+    except Exception as e:
+        logging.warning("Не удалось сбросить кнопку меню бота: %s", e)
 
     # API для Mini App
     host = "0.0.0.0"
