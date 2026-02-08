@@ -1,7 +1,7 @@
 """
 Продлить подписку пользователю. Работает для активной и просроченной.
 - Активная: добавляет время к текущему expires_at.
-- Просроченная: создаёт новую подписку, добавляет в Xray, ставит свой срок.
+- Просроченная: переиспользуем тот же UUID (пользователь уже в Xray), продлеваем в БД.
 
 Запуск: python scripts/extend_subscription.py username --days 30
     или: python scripts/extend_subscription.py username --days 7 --hours 12 --minutes 30
@@ -93,6 +93,20 @@ def main():
                     expires_at = max(base, now) + timedelta(seconds=duration_seconds)
                 else:
                     expires_at = now + timedelta(seconds=duration_seconds)
+
+            # Просроченная/старая подписка с uuid и server_id — продлеваем тот же UUID, в Xray не лезем
+            if sub_row and sub_row.uuid and sub_row.server_id:
+                sub_row.status = "active"
+                sub_row.expires_at = expires_at
+                db.add(sub_row)
+                db.commit()
+                dur = []
+                if args.days: dur.append(f"{args.days} дн.")
+                if args.hours: dur.append(f"{args.hours} ч.")
+                if args.minutes: dur.append(f"{args.minutes} мин.")
+                print(f"Подписка продлена (тот же UUID): uuid={sub_row.uuid} expires_at={expires_at}")
+                print("Ключ в личном кабинете не меняется.")
+                return 0
 
             server = get_least_loaded_server(db)
             if not server:
