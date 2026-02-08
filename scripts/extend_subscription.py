@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select, desc
 from api.server import get_least_loaded_server
-from api.xray_grpc import add_user_to_xray
+from api.xray_grpc import add_user_to_xray, remove_user_from_xray
 from bot.config import XRAY_INBOUND_TAG
 from db.models import Server, Subscription, User
 from db.session import SessionLocal
@@ -95,16 +95,27 @@ def main():
                     expires_at = now + timedelta(seconds=duration_seconds)
 
             # Просроченная/старая подписка с uuid и server_id — продлеваем тот же UUID, в Xray не лезем
-            if sub_row and sub_row.uuid and sub_row.server_id:
-                sub_row.status = "active"
-                sub_row.expires_at = expires_at
-                db.add(sub_row)
+            # Ищем любую подписку пользователя с uuid и server_id (на случай если последняя без server_id)
+            sub_for_reuse = (
+                db.execute(
+                    select(Subscription)
+                    .where(Subscription.user_id == user.id)
+                    .where(Subscription.uuid.isnot(None))
+                    .where(Subscription.server_id.isnot(None))
+                    .order_by(desc(Subscription.created_at))
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if sub_for_reuse and sub_for_reuse.uuid and sub_for_reuse.server_id:
+                sub_for_reuse.status = "active"
+                sub_for_reuse.expires_at = expires_at
+                db.add(sub_for_reuse)
                 db.commit()
                 dur = []
                 if args.days: dur.append(f"{args.days} дн.")
                 if args.hours: dur.append(f"{args.hours} ч.")
                 if args.minutes: dur.append(f"{args.minutes} мин.")
-                print(f"Подписка продлена (тот же UUID): uuid={sub_row.uuid} expires_at={expires_at}")
+                print(f"Подписка продлена (тот же UUID): uuid={sub_for_reuse.uuid} expires_at={expires_at}")
                 print("Ключ в личном кабинете не меняется.")
                 return 0
 
@@ -115,6 +126,22 @@ def main():
 
             sub_uuid = str(uuid4())
             email = f"user_{user.id}"
+            # Если user_N уже есть в Xray (старая подписка без server_id или на другом сервере) — сначала убираем
+            all_servers = list(db.execute(select(Server)).scalars().all())
+            for srv in all_servers:
+                try:
+                    remove_user_from_xray(
+                        host=srv.host,
+                        grpc_port=srv.grpc_port,
+                        email=email,
+                        inbound_tag=XRAY_INBOUND_TAG,
+                    )
+                    srv.active_users = max(0, srv.active_users - 1)
+                    db.add(srv)
+                    db.commit()
+                except Exception:
+                    pass
+
             try:
                 add_user_to_xray(
                     host=server.host,
