@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from common.serial import typed_message_pb2 as common_dot_serial_dot_typed__message__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1a\x63ommon/protocol/user.proto\x12\x14xray.common.protocol\x1a!common/serial/typed_message.proto\"W\n\x04User\x12\r\n\x05level\x18\x01 \x01(\r\x12\r\n\x05\x65mail\x18\x02 \x01(\t\x12\x31\n\x07\x61\x63\x63ount\x18\x03 \x01(\x0b\x32 .xray.common.serial.TypedMessageB+Z)github.com/xtls/xray-core/common/protocolb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1a\x63ommon/protocol/user.proto\x12\x14xray.common.protocol\x1a!common/serial/typed_message.proto\"i\n\x04User\x12\r\n\x05level\x18\x01 \x01(\r\x12\r\n\x05\x65mail\x18\x02 \x01(\t\x12\x31\n\x07\x61\x63\x63ount\x18\x03 \x01(\x0b\x32 .xray.common.serial.TypedMessage\x12\x10\n\x08limit_ip\x18\x04 \x01(\rB+Z)github.com/xtls/xray-core/common/protocolb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,5 +34,5 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z)github.com/xtls/xray-core/common/protocol'
   _globals['_USER']._serialized_start=87
-  _globals['_USER']._serialized_end=174
+  _globals['_USER']._serialized_end=192
 # @@protoc_insertion_point(module_scope)

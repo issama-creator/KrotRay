@@ -89,6 +89,7 @@ def main():
                     user_uuid=new_uuid,
                     email=email,
                     inbound_tag=XRAY_INBOUND_TAG,
+                    limit_ip=1,
                 )
                 server_row.active_users += 1
             except Exception as e:

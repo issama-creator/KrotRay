@@ -117,6 +117,7 @@ def main():
                             user_uuid=sub_for_reuse.uuid,
                             email=f"user_{user.id}",
                             inbound_tag=XRAY_INBOUND_TAG,
+                            limit_ip=1,
                         )
                         server_row.active_users += 1
                         db.add(server_row)
@@ -165,6 +166,7 @@ def main():
                     user_uuid=sub_uuid,
                     email=email,
                     inbound_tag=XRAY_INBOUND_TAG,
+                    limit_ip=1,
                 )
                 server.active_users += 1
                 db.add(server)

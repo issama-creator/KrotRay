@@ -87,6 +87,7 @@ def main():
                 user_uuid=sub_uuid,
                 email=email,
                 inbound_tag=XRAY_INBOUND_TAG,
+                limit_ip=1,
             )
             server.active_users += 1
             db.add(server)
