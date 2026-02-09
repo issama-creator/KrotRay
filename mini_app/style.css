@@ -610,12 +610,12 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 44px 0 0;
+  padding: 64px 0 0;
   margin-bottom: 0;
 }
 
 .tariffs .section-title {
-  margin-top: -40px;
+  margin-top: -48px;
   margin-bottom: 12px;
   font-size: 15px;
   font-weight: 700;
