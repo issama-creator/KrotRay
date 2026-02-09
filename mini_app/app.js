@@ -64,16 +64,49 @@
       var el = document.getElementById("payment-amount");
       var summaryEl = document.getElementById("payment-summary-info");
       if (el) {
-        // Берем цену из выбранного тарифа напрямую из DOM
+        // Берем цену из выбранного тарифа с учетом текущего количества устройств
         var selectedRow = document.querySelector(".tariff-row_selected");
-        var price = selectedTariff.price;
+        var price = null;
+        
+        // Сначала пытаемся взять из data-price (должна быть актуальной после updatePrices)
         if (selectedRow && selectedRow.dataset.price) {
           price = parseInt(selectedRow.dataset.price, 10);
         }
-        // Проверка на валидность
+        
+        // Если цена не найдена или некорректна, пересчитываем из базовой цены
         if (isNaN(price) || price <= 0) {
-          price = 100; // Значение по умолчанию
+          var basePrice = 100; // значение по умолчанию
+          if (selectedRow && selectedRow.dataset.basePrice) {
+            basePrice = parseInt(selectedRow.dataset.basePrice, 10);
+          } else {
+            // Определяем базовую цену по тарифу
+            var tariffId = selectedTariff.tariffId || (selectedTariff.months === 1 ? "1m" : (selectedTariff.months === 3 ? "3m" : "6m"));
+            var basePrices = {
+              "1m": 100,
+              "3m": 250,
+              "6m": 550
+            };
+            basePrice = basePrices[tariffId] || 100;
+          }
+          // Пересчитываем цену: базовая цена * количество устройств
+          price = basePrice * (selectedDevices || 1);
         }
+        
+        // Проверяем, что цена соответствует ожидаемой (базовая * устройства)
+        // Это защита от устаревших данных
+        if (selectedRow && selectedRow.dataset.basePrice) {
+          var expectedBasePrice = parseInt(selectedRow.dataset.basePrice, 10);
+          var expectedPrice = expectedBasePrice * (selectedDevices || 1);
+          // Если цена не соответствует ожидаемой, используем пересчитанную
+          if (Math.abs(price - expectedPrice) > 0.01) {
+            price = expectedPrice;
+            // Обновляем data-price для будущих использований
+            if (selectedRow) {
+              selectedRow.dataset.price = price;
+            }
+          }
+        }
+        
         el.textContent = price + " ₽";
         // Обновляем selectedTariff для корректной передачи на сервер
         selectedTariff.price = price;
@@ -323,6 +356,13 @@
     if (btnTariffsNext) {
       btnTariffsNext.onclick = function () {
         tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
+        // Обновляем цены перед переходом на экран оплаты
+        updatePrices();
+        // Убеждаемся, что selectedTariff.price актуален
+        var selectedRow = document.querySelector(".tariff-row_selected");
+        if (selectedRow && selectedRow.dataset.price) {
+          selectedTariff.price = parseInt(selectedRow.dataset.price, 10);
+        }
         showScreen("payment");
       };
     }
