@@ -219,6 +219,17 @@
       }
     }
     
+    // Функция для сброса выбранного тарифа
+    function resetTariffSelection() {
+      document.querySelectorAll(".tariff-row").forEach(function(row) {
+        row.classList.remove("tariff-row_selected");
+      });
+      // Сбрасываем selectedTariff на первый тариф по умолчанию
+      selectedTariff.tariffId = "1m";
+      selectedTariff.months = 1;
+      selectedTariff.price = 100 * selectedDevices;
+    }
+    
     // Обработка выбора количества устройств
     document.querySelectorAll(".devices-switcher__item").forEach(function(item) {
       item.onclick = function() {
@@ -228,6 +239,7 @@
         });
         this.classList.add("devices-switcher__item_active");
         selectedDevices = parseInt(this.dataset.devices, 10);
+        resetTariffSelection(); // Сбрасываем выбор тарифа
         updatePrices();
       };
     });
