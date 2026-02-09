@@ -99,7 +99,7 @@ body {
 /* Кнопка «Перейти к оплате» внизу */
 .tariffs-pay-actions {
   margin-top: auto;
-  padding-top: 24px;
+  padding-top: 17px;
   padding-bottom: 28px;
   text-align: center;
 }
@@ -615,7 +615,7 @@ body {
 }
 
 .tariffs .section-title {
-  margin-top: -48px;
+  margin-top: -58px;
   margin-bottom: 12px;
   font-size: 15px;
   font-weight: 700;
