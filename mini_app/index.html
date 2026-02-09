@@ -58,7 +58,7 @@
       <div class="screen screen-tariffs screen_hidden" id="screen-tariffs">
         <button type="button" class="tariffs-back" id="btn-tariffs-back">← Назад</button>
         <section class="tariffs">
-          <h2 class="section-title">Тарифы</h2>
+          <h2 class="section-title">Выберите тариф</h2>
           <div class="devices-switcher">
             <button type="button" class="devices-switcher__item devices-switcher__item_active" data-devices="1">1 устройство</button>
             <button type="button" class="devices-switcher__item" data-devices="2">2</button>
@@ -69,7 +69,10 @@
           <p class="tariffs__note">1 ключ · <span class="tariff-note__digit" id="selected-devices-count">1</span> <span id="devices-word">устройство</span></p>
           <div class="tariff-card">
             <button type="button" class="tariff-row tariff-row_selected" data-tariff-id="1m" data-months="1" data-base-price="100" id="tariff-1">
-              <span class="tariff-row__period">1 месяц</span>
+              <span class="tariff-row__period">
+                1 месяц
+                <span class="tariff-row__badge tariff-row__badge_basic">БАЗОВЫЙ</span>
+              </span>
               <span class="tariff-row__price" id="price-1m">100 ₽</span>
               <span class="tariff-row__radio"></span>
             </button>

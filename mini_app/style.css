@@ -99,7 +99,7 @@ body {
 /* Кнопка «Перейти к оплате» внизу */
 .tariffs-pay-actions {
   margin-top: auto;
-  padding-top: 17px;
+  padding-top: 7px;
   padding-bottom: 28px;
   text-align: center;
 }
@@ -626,7 +626,7 @@ body {
 .devices-switcher {
   display: flex;
   gap: 4px;
-  margin-top: 40px;
+  margin-top: 30px;
   margin-bottom: 16px;
   padding: 4px;
   height: 36px;
@@ -777,6 +777,12 @@ body {
   letter-spacing: 0.05em;
   border-radius: 4px;
   vertical-align: middle;
+}
+
+.tariff-row__badge_basic {
+  background: linear-gradient(135deg, #4DA3FF, #6E8BFF);
+  color: #FFFFFF;
+  box-shadow: 0 2px 4px rgba(77, 163, 255, 0.3);
 }
 
 .tariff-row__meta {
