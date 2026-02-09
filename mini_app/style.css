@@ -168,14 +168,12 @@ body {
   background: transparent;
 }
 
-/* Иконка СБП — многоцветная геометрия */
-.icon-sbp {
+/* Иконка СБП — PNG */
+.icon-sbp-img {
   display: block;
   width: 24px;
   height: 24px;
-  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 25%, #059669 45%, #dc2626 65%, #ea580c 85%, #eab308 100%);
-  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-  border-radius: 4px;
+  object-fit: contain;
 }
 
 .payment-method__icon_card {
