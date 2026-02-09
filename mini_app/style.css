@@ -109,6 +109,9 @@ body {
   min-height: 56px;
   font-size: 17px;
   font-weight: 600;
+  background: linear-gradient(135deg, #4DA3FF, #6E8BFF);
+  color: #FFFFFF;
+  box-shadow: 0 6px 20px rgba(77, 163, 255, 0.35);
 }
 
 .payment-method {
@@ -281,6 +284,9 @@ body {
   min-height: 56px;
   font-size: 17px;
   font-weight: 600;
+  background: linear-gradient(135deg, #4DA3FF, #6E8BFF);
+  color: #FFFFFF;
+  box-shadow: 0 6px 20px rgba(77, 163, 255, 0.35);
 }
 
 .payment-screen__note {
@@ -699,9 +705,14 @@ body {
   transition: border-color 0.2s, background 0.2s;
 }
 
+.tariff-row_selected {
+  background: rgba(77, 163, 255, 0.12);
+  border-left: 3px solid rgba(77, 163, 255, 0.4);
+}
+
 .tariff-row_selected .tariff-row__radio {
-  border-color: #3b82f6;
-  background: #3b82f6;
+  border-color: #4DA3FF;
+  background: #4DA3FF;
   box-shadow: inset 0 0 0 3px var(--tg-theme-bg-color, #0f0f14);
 }
 
@@ -732,6 +743,20 @@ body {
 .tariff-row__savings .tariff-savings__amount {
   color: #3b82f6;
   font-weight: 600;
+}
+
+.tariff-row__badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: #2ED47A;
+  color: #0B1F14;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 4px;
+  vertical-align: middle;
 }
 
 .tariff-row__meta {
@@ -789,9 +814,9 @@ body {
 }
 
 .btn_primary {
-  background: linear-gradient(180deg, #4f8cff 0%, #2563eb 100%);
-  color: var(--tg-theme-button-text-color, #fff);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, #4DA3FF, #6E8BFF);
+  color: #FFFFFF;
+  box-shadow: 0 6px 20px rgba(77, 163, 255, 0.35);
 }
 
 .btn_secondary {
