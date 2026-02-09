@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["payments"])
 
 TARIFFS = {
-    "1m": (1, 100),       # 1 ключ · 1 устройство
-    "3m": (3, 250),
-    "family5": (1, 500),  # до 5 устройств, 1 мес
-}  # tariff_id -> (months, amount_rub)
+    "1m": (1, 100),       # 1 месяц, базовая цена за 1 устройство
+    "3m": (3, 250),       # 3 месяца, базовая цена за 1 устройство
+    "6m": (6, 550),       # 6 месяцев, базовая цена за 1 устройство
+}  # tariff_id -> (months, base_amount_rub_per_device)
 
 
 def get_db():
@@ -57,8 +57,10 @@ def get_current_user(
 
 
 class CreatePaymentRequest(BaseModel):
-    tariff: str  # "1m" | "3m" | "family5"
+    tariff: str  # "1m" | "3m" | "6m"
     method: str  # "sbp" | "card"
+    devices: int = 1  # количество устройств (1-5)
+    price: float  # рассчитанная цена (базовая цена тарифа * количество устройств)
 
 
 class CreatePaymentResponse(BaseModel):
@@ -75,8 +77,35 @@ def create_payment(
     """Создать платёж в ЮKassa, сохранить pending, вернуть confirmation_url."""
     if body.tariff not in TARIFFS or body.method not in ("sbp", "card"):
         raise HTTPException(status_code=400, detail="Неверный tariff или method")
-    months, amount_rub = TARIFFS[body.tariff]
+    if not (1 <= body.devices <= 5):
+        raise HTTPException(status_code=400, detail="devices должно быть от 1 до 5")
+    if body.price <= 0:
+        raise HTTPException(status_code=400, detail="price должна быть больше 0")
+    
+    months, base_amount_rub = TARIFFS[body.tariff]
+    # Ожидаемая цена = базовая цена * количество устройств
+    expected_amount_rub = base_amount_rub * body.devices
+    
+    # Используем цену, переданную из UI (которую видит пользователь)
+    # Но проверяем, что она соответствует ожидаемой (с небольшой погрешностью для округления)
+    if abs(body.price - expected_amount_rub) > 0.01:
+        logger.warning(
+            "Price mismatch: UI sent price=%.2f, but expected %.2f (tariff=%s, devices=%d, base=%.2f)",
+            body.price, expected_amount_rub, body.tariff, body.devices, base_amount_rub
+        )
+        # Используем ожидаемую цену для безопасности
+        amount_rub = expected_amount_rub
+    else:
+        # Используем цену из UI
+        amount_rub = body.price
+    
     amount_str = f"{amount_rub:.2f}"
+    
+    # Логирование для отладки
+    logger.info(
+        "CREATE PAYMENT: tariff=%s, devices=%d, base_price=%.2f, ui_price=%.2f, final_amount=%.2f, method=%s",
+        body.tariff, body.devices, base_amount_rub, body.price, amount_rub, body.method
+    )
 
     if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
         raise HTTPException(
@@ -102,7 +131,7 @@ def create_payment(
             "amount": {"value": amount_str, "currency": "RUB"},
             "confirmation": {"type": "redirect", "return_url": PAYMENT_RETURN_URL},
             "capture": True,
-            "description": f"KrotVPN {months} мес.",
+            "description": f"KrotVPN {months} мес. · {body.devices} {'устройство' if body.devices == 1 else ('устройства' if 2 <= body.devices <= 4 else 'устройств')}",
         }
         if with_method:
             payment_method_type = "sbp" if body.method == "sbp" else "bank_card"
@@ -124,6 +153,13 @@ def create_payment(
             err_msg = str(e.args[0])[:500]
         return err_msg
 
+    # Логирование перед отправкой в ЮKassa
+    payload_debug = _payload(True)
+    logger.info(
+        "YooKassa payload: amount=%s, description=%s, method=%s",
+        payload_debug.get("amount"), payload_debug.get("description"), body.method
+    )
+    
     yoo = None
     last_error = None
     for with_method in (True, False):

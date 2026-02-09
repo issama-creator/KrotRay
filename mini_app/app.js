@@ -351,7 +351,20 @@
     if (btnPay) {
       btnPay.onclick = function () {
         tg.HapticFeedback && tg.HapticFeedback.impactOccurred("medium");
-        var tariffId = selectedTariff.tariffId || (selectedTariff.months === 1 ? "1m" : "3m");
+        var tariffId = selectedTariff.tariffId || (
+          selectedTariff.months === 1 ? "1m" : 
+          selectedTariff.months === 3 ? "3m" : 
+          selectedTariff.months === 6 ? "6m" : "1m"
+        );
+        // Получаем актуальную цену из выбранного тарифа (уже рассчитанную с учетом устройств)
+        var selectedRow = document.querySelector(".tariff-row_selected");
+        var actualPrice = selectedTariff.price;
+        if (selectedRow && selectedRow.dataset.price) {
+          actualPrice = parseInt(selectedRow.dataset.price, 10);
+        }
+        if (isNaN(actualPrice) || actualPrice <= 0) {
+          actualPrice = selectedTariff.price || 100;
+        }
         var initData = tg.initData || "";
         btnPay.disabled = true;
         fetch(apiBase + "/api/payments/create", {
@@ -360,7 +373,12 @@
             "Content-Type": "application/json",
             "X-Telegram-Init-Data": initData,
           },
-          body: JSON.stringify({ tariff: tariffId, method: selectedPaymentMethod, devices: selectedDevices }),
+          body: JSON.stringify({ 
+            tariff: tariffId, 
+            method: selectedPaymentMethod, 
+            devices: selectedDevices,
+            price: actualPrice  // Отправляем рассчитанную цену, которую видит пользователь
+          }),
         })
           .then(function (res) {
             return res.json().then(function (json) {
