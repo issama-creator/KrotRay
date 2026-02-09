@@ -99,10 +99,11 @@ body {
 /* Кнопка «Перейти к оплате» внизу */
 .tariffs-pay-actions {
   margin-top: auto;
-  padding-top: 24px;
+  padding-top: 0;
   padding-bottom: 28px;
   text-align: center;
   margin-bottom: -25px;
+  transform: translateY(-25px);
 }
 
 .tariffs-pay-actions .btn_large {
