@@ -598,34 +598,40 @@ body {
   color: var(--tg-theme-text-color, #e4e4e7);
 }
 
-/* Свитчер выбора количества устройств */
+/* Свитчер выбора количества устройств — премиум дизайн */
 .devices-switcher {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 16px;
   padding: 4px;
-  background: var(--tg-theme-secondary-bg-color, #1c1c22);
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
   border-radius: 12px;
 }
 
 .devices-switcher__item {
   flex: 1;
-  padding: 10px 8px;
+  padding: 0 12px;
   background: transparent;
   border: none;
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--tg-theme-hint-color, #71717a);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .devices-switcher__item_active {
-  background: var(--tg-theme-button-color, #3b82f6);
-  color: var(--tg-theme-button-text-color, #ffffff);
+  background: linear-gradient(135deg, #4DA3FF, #6E8BFF);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(77, 163, 255, 0.35);
 }
 
 .devices-switcher__item:active {
