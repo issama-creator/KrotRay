@@ -365,6 +365,24 @@
         if (isNaN(actualPrice) || actualPrice <= 0) {
           actualPrice = selectedTariff.price || 100;
         }
+        
+        // Логирование для отладки
+        console.log("Sending payment request:", {
+          tariff: tariffId,
+          method: selectedPaymentMethod,
+          devices: selectedDevices,
+          price: actualPrice,
+          selectedTariff: selectedTariff,
+          selectedRow: selectedRow ? {
+            dataset: {
+              tariffId: selectedRow.dataset.tariffId,
+              months: selectedRow.dataset.months,
+              basePrice: selectedRow.dataset.basePrice,
+              price: selectedRow.dataset.price
+            }
+          } : null
+        });
+        
         var initData = tg.initData || "";
         btnPay.disabled = true;
         fetch(apiBase + "/api/payments/create", {

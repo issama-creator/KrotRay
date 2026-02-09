@@ -60,7 +60,7 @@ class CreatePaymentRequest(BaseModel):
     tariff: str  # "1m" | "3m" | "6m"
     method: str  # "sbp" | "card"
     devices: int = 1  # количество устройств (1-5)
-    price: float  # рассчитанная цена (базовая цена тарифа * количество устройств)
+    price: float | None = None  # рассчитанная цена (базовая цена тарифа * количество устройств), опционально
 
 
 class CreatePaymentResponse(BaseModel):
@@ -75,12 +75,18 @@ def create_payment(
     db: Session = Depends(get_db),
 ):
     """Создать платёж в ЮKassa, сохранить pending, вернуть confirmation_url."""
-    if body.tariff not in TARIFFS or body.method not in ("sbp", "card"):
-        raise HTTPException(status_code=400, detail="Неверный tariff или method")
+    # Детальное логирование входящих данных для отладки
+    logger.info("Received payment request: tariff=%s, method=%s, devices=%d, price=%s", 
+                body.tariff, body.method, body.devices, body.price)
+    
+    if body.tariff not in TARIFFS:
+        logger.error("Invalid tariff: %s (available: %s)", body.tariff, list(TARIFFS.keys()))
+        raise HTTPException(status_code=400, detail=f"Неверный tariff: {body.tariff}. Доступны: {', '.join(TARIFFS.keys())}")
+    if body.method not in ("sbp", "card"):
+        logger.error("Invalid method: %s", body.method)
+        raise HTTPException(status_code=400, detail=f"Неверный method: {body.method}. Доступны: sbp, card")
     if not (1 <= body.devices <= 5):
         raise HTTPException(status_code=400, detail="devices должно быть от 1 до 5")
-    if body.price <= 0:
-        raise HTTPException(status_code=400, detail="price должна быть больше 0")
     
     months, base_amount_rub = TARIFFS[body.tariff]
     # Ожидаемая цена = базовая цена * количество устройств
@@ -88,16 +94,21 @@ def create_payment(
     
     # Используем цену, переданную из UI (которую видит пользователь)
     # Но проверяем, что она соответствует ожидаемой (с небольшой погрешностью для округления)
-    if abs(body.price - expected_amount_rub) > 0.01:
-        logger.warning(
-            "Price mismatch: UI sent price=%.2f, but expected %.2f (tariff=%s, devices=%d, base=%.2f)",
-            body.price, expected_amount_rub, body.tariff, body.devices, base_amount_rub
-        )
-        # Используем ожидаемую цену для безопасности
-        amount_rub = expected_amount_rub
+    if body.price is not None and body.price > 0:
+        if abs(body.price - expected_amount_rub) > 0.01:
+            logger.warning(
+                "Price mismatch: UI sent price=%.2f, but expected %.2f (tariff=%s, devices=%d, base=%.2f)",
+                body.price, expected_amount_rub, body.tariff, body.devices, base_amount_rub
+            )
+            # Используем ожидаемую цену для безопасности
+            amount_rub = expected_amount_rub
+        else:
+            # Используем цену из UI
+            amount_rub = body.price
     else:
-        # Используем цену из UI
-        amount_rub = body.price
+        # Если цена не передана или некорректна, используем ожидаемую
+        logger.info("Price not provided or invalid, using calculated price: %.2f", expected_amount_rub)
+        amount_rub = expected_amount_rub
     
     amount_str = f"{amount_rub:.2f}"
     
