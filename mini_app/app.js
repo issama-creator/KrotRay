@@ -62,7 +62,21 @@
     if (payment) payment.classList.toggle("screen_hidden", name !== "payment");
     if (name === "payment") {
       var el = document.getElementById("payment-amount");
-      if (el) el.textContent = selectedTariff.price + " ₽";
+      if (el) {
+        // Берем цену из выбранного тарифа напрямую из DOM
+        var selectedRow = document.querySelector(".tariff-row_selected");
+        var price = selectedTariff.price;
+        if (selectedRow && selectedRow.dataset.price) {
+          price = parseInt(selectedRow.dataset.price, 10);
+        }
+        // Проверка на валидность
+        if (isNaN(price) || price <= 0) {
+          price = 100; // Значение по умолчанию
+        }
+        el.textContent = price + " ₽";
+        // Обновляем selectedTariff для корректной передачи на сервер
+        selectedTariff.price = price;
+      }
     }
   }
 
@@ -230,7 +244,13 @@
       card.classList.add("tariff-row_selected");
       selectedTariff.tariffId = card.dataset.tariffId || (parseInt(card.dataset.months, 10) === 1 ? "1m" : (parseInt(card.dataset.months, 10) === 3 ? "3m" : "6m"));
       selectedTariff.months = parseInt(card.dataset.months, 10);
-      selectedTariff.price = parseInt(card.dataset.price, 10);
+      var price = parseInt(card.dataset.price, 10);
+      if (isNaN(price) || price <= 0) {
+        // Если цена не установлена, вычисляем из базовой цены
+        var basePrice = parseInt(card.dataset.basePrice, 10) || 100;
+        price = basePrice * selectedDevices;
+      }
+      selectedTariff.price = price;
     }
 
     function setPaymentMethod(method) {
@@ -253,6 +273,12 @@
     
     // Инициализация цен при загрузке
     updatePrices();
+    
+    // Убеждаемся, что выбранный тариф имеет правильную цену
+    var selectedRow = document.querySelector(".tariff-row_selected");
+    if (selectedRow) {
+      setSelected(selectedRow);
+    }
 
     if (btnBuyKeyTop) {
       btnBuyKeyTop.onclick = function () {
