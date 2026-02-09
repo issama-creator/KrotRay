@@ -598,6 +598,40 @@ body {
   color: var(--tg-theme-text-color, #e4e4e7);
 }
 
+/* Свитчер выбора количества устройств */
+.devices-switcher {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: var(--tg-theme-secondary-bg-color, #1c1c22);
+  border: 1px solid var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+}
+
+.devices-switcher__item {
+  flex: 1;
+  padding: 10px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color, #71717a);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.devices-switcher__item_active {
+  background: var(--tg-theme-button-color, #3b82f6);
+  color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.devices-switcher__item:active {
+  opacity: 0.8;
+}
+
 .tariffs__note {
   margin: 0 0 16px;
   font-size: 14px;

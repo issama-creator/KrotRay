@@ -23,6 +23,7 @@
 
   var selectedTariff = { tariffId: "1m", months: 1, price: 100 };
   var selectedPaymentMethod = "sbp"; // "sbp" | "card"
+  var selectedDevices = 1; // 1-5 устройств
 
   function formatDate(isoStr) {
     if (!isoStr) return "";
@@ -155,7 +156,67 @@
   function bindEvents() {
     var tariff1 = document.getElementById("tariff-1");
     var tariff3 = document.getElementById("tariff-3");
+    var tariff6 = document.getElementById("tariff-6");
     var btnBuyKeyTop = document.getElementById("btn-buy-key-top");
+    
+    // Функция для пересчета цен в зависимости от количества устройств
+    function updatePrices() {
+      var basePrices = {
+        "1m": 100,
+        "3m": 250,
+        "6m": 550
+      };
+      
+      // Цена = базовая цена * количество устройств
+      Object.keys(basePrices).forEach(function(tariffId) {
+        var basePrice = basePrices[tariffId];
+        var price = basePrice * selectedDevices;
+        var priceEl = document.getElementById("price-" + tariffId);
+        if (priceEl) priceEl.textContent = price + " ₽";
+        
+        // Обновить data-price для тарифа
+        var tariffEl = document.getElementById("tariff-" + tariffId);
+        if (tariffEl) {
+          tariffEl.dataset.price = price;
+          // Если это выбранный тариф, обновить selectedTariff
+          if (tariffEl.classList.contains("tariff-row_selected")) {
+            selectedTariff.price = price;
+          }
+        }
+      });
+      
+      // Обновить экономию для 3 месяцев (базовая экономия * количество устройств)
+      var savings3m = 50 * selectedDevices;
+      var savingsEl = document.getElementById("savings-3m");
+      if (savingsEl) savingsEl.textContent = savings3m + " ₽";
+      
+      // Обновить текст количества устройств
+      var devicesCountEl = document.getElementById("selected-devices-count");
+      var devicesWordEl = document.getElementById("devices-word");
+      if (devicesCountEl) devicesCountEl.textContent = selectedDevices;
+      if (devicesWordEl) {
+        if (selectedDevices === 1) {
+          devicesWordEl.textContent = "устройство";
+        } else if (selectedDevices >= 2 && selectedDevices <= 4) {
+          devicesWordEl.textContent = "устройства";
+        } else {
+          devicesWordEl.textContent = "устройств";
+        }
+      }
+    }
+    
+    // Обработка выбора количества устройств
+    document.querySelectorAll(".devices-switcher__item").forEach(function(item) {
+      item.onclick = function() {
+        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
+        document.querySelectorAll(".devices-switcher__item").forEach(function(i) {
+          i.classList.remove("devices-switcher__item_active");
+        });
+        this.classList.add("devices-switcher__item_active");
+        selectedDevices = parseInt(this.dataset.devices, 10);
+        updatePrices();
+      };
+    });
     var btnTariffsBack = document.getElementById("btn-tariffs-back");
     var btnTariffsNext = document.getElementById("btn-tariffs-next");
     var btnPaymentBack = document.getElementById("btn-payment-back");
@@ -167,7 +228,7 @@
         c.classList.remove("tariff-row_selected");
       });
       card.classList.add("tariff-row_selected");
-      selectedTariff.tariffId = card.dataset.tariffId || (parseInt(card.dataset.months, 10) === 1 ? "1m" : "3m");
+      selectedTariff.tariffId = card.dataset.tariffId || (parseInt(card.dataset.months, 10) === 1 ? "1m" : (parseInt(card.dataset.months, 10) === 3 ? "3m" : "6m"));
       selectedTariff.months = parseInt(card.dataset.months, 10);
       selectedTariff.price = parseInt(card.dataset.price, 10);
     }
@@ -179,7 +240,6 @@
       });
     }
 
-    var tariffFamily5 = document.getElementById("tariff-family5");
     function bindTariffRow(el) {
       if (!el) return;
       el.onclick = function () {
@@ -189,7 +249,10 @@
     }
     bindTariffRow(tariff1);
     bindTariffRow(tariff3);
-    bindTariffRow(tariffFamily5);
+    bindTariffRow(tariff6);
+    
+    // Инициализация цен при загрузке
+    updatePrices();
 
     if (btnBuyKeyTop) {
       btnBuyKeyTop.onclick = function () {
@@ -243,7 +306,7 @@
             "Content-Type": "application/json",
             "X-Telegram-Init-Data": initData,
           },
-          body: JSON.stringify({ tariff: tariffId, method: selectedPaymentMethod }),
+          body: JSON.stringify({ tariff: tariffId, method: selectedPaymentMethod, devices: selectedDevices }),
         })
           .then(function (res) {
             return res.json().then(function (json) {

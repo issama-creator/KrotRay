@@ -59,27 +59,31 @@
         <button type="button" class="tariffs-back" id="btn-tariffs-back">← Назад</button>
         <section class="tariffs">
           <h2 class="section-title">Тарифы</h2>
-          <p class="tariffs__note">1 ключ · <span class="tariff-note__digit">1</span> устройство</p>
+          <div class="devices-switcher">
+            <button type="button" class="devices-switcher__item devices-switcher__item_active" data-devices="1">1</button>
+            <button type="button" class="devices-switcher__item" data-devices="2">2</button>
+            <button type="button" class="devices-switcher__item" data-devices="3">3</button>
+            <button type="button" class="devices-switcher__item" data-devices="4">4</button>
+            <button type="button" class="devices-switcher__item" data-devices="5">5</button>
+          </div>
+          <p class="tariffs__note">1 ключ · <span class="tariff-note__digit" id="selected-devices-count">1</span> <span id="devices-word">устройство</span></p>
           <div class="tariff-card">
-            <button type="button" class="tariff-row tariff-row_selected" data-tariff-id="1m" data-months="1" data-price="100" id="tariff-1">
+            <button type="button" class="tariff-row tariff-row_selected" data-tariff-id="1m" data-months="1" data-base-price="100" id="tariff-1">
               <span class="tariff-row__period">1 месяц</span>
-              <span class="tariff-row__price">100 ₽</span>
+              <span class="tariff-row__price" id="price-1m">100 ₽</span>
               <span class="tariff-row__radio"></span>
             </button>
-            <button type="button" class="tariff-row" data-tariff-id="3m" data-months="3" data-price="250" id="tariff-3">
+            <button type="button" class="tariff-row" data-tariff-id="3m" data-months="3" data-base-price="250" id="tariff-3">
               <span class="tariff-row__info">
                 <span class="tariff-row__period">3 месяца</span>
-                <span class="tariff-row__savings">Экономия <span class="tariff-savings__amount">50 ₽</span></span>
+                <span class="tariff-row__savings">Экономия <span class="tariff-savings__amount" id="savings-3m">50 ₽</span></span>
               </span>
-              <span class="tariff-row__price">250 ₽</span>
+              <span class="tariff-row__price" id="price-3m">250 ₽</span>
               <span class="tariff-row__radio"></span>
             </button>
-          </div>
-          <p class="tariffs__note tariffs__note_lower">Family · 1 ключ — до <span class="tariff-note__digit">5</span> устройств</p>
-          <div class="tariff-card tariff-card_spaced">
-            <button type="button" class="tariff-row" data-tariff-id="family5" data-months="1" data-price="500" id="tariff-family5">
-              <span class="tariff-row__period">1 месяц</span>
-              <span class="tariff-row__price">500 ₽</span>
+            <button type="button" class="tariff-row" data-tariff-id="6m" data-months="6" data-base-price="550" id="tariff-6">
+              <span class="tariff-row__period">6 месяцев</span>
+              <span class="tariff-row__price" id="price-6m">550 ₽</span>
               <span class="tariff-row__radio"></span>
             </button>
           </div>
