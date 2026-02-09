@@ -100,7 +100,10 @@
       <div class="screen screen-payment screen_hidden" id="screen-payment">
         <button type="button" class="tariffs-back" id="btn-payment-back">← Назад</button>
         <section class="payment-screen">
-          <p class="payment-screen__to-pay" id="payment-amount">100 ₽</p>
+          <div class="payment-screen__summary">
+            <p class="payment-screen__to-pay" id="payment-amount">100 ₽</p>
+            <p class="payment-screen__summary-info" id="payment-summary-info">1 месяц • 1 устройство</p>
+          </div>
           <p class="payment-screen__method-label">Способ оплаты</p>
           <div class="payment-method-card">
             <button type="button" class="payment-method__row payment-method__row_selected" data-method="sbp" id="payment-method-sbp">
@@ -119,6 +122,7 @@
           <div class="payment-screen__actions">
             <button type="button" class="btn btn_primary btn_large" id="btn-pay">Оплатить</button>
             <p class="payment-screen__hint-text">После нажатия откроется окно ЮKassa для оплаты</p>
+            <p class="payment-screen__security">🔒 Безопасная оплата через ЮKassa</p>
           </div>
         </section>
       </div>

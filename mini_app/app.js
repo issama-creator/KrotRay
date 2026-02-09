@@ -62,6 +62,7 @@
     if (payment) payment.classList.toggle("screen_hidden", name !== "payment");
     if (name === "payment") {
       var el = document.getElementById("payment-amount");
+      var summaryEl = document.getElementById("payment-summary-info");
       if (el) {
         // Берем цену из выбранного тарифа напрямую из DOM
         var selectedRow = document.querySelector(".tariff-row_selected");
@@ -76,6 +77,14 @@
         el.textContent = price + " ₽";
         // Обновляем selectedTariff для корректной передачи на сервер
         selectedTariff.price = price;
+      }
+      // Обновляем контекстную информацию (месяцы • устройства)
+      if (summaryEl) {
+        var months = selectedTariff.months || 1;
+        var devices = selectedDevices || 1;
+        var monthsText = months === 1 ? "1 месяц" : (months === 3 ? "3 месяца" : "6 месяцев");
+        var devicesText = devices === 1 ? "1 устройство" : (devices >= 2 && devices <= 4 ? devices + " устройства" : devices + " устройств");
+        summaryEl.textContent = monthsText + " • " + devicesText;
       }
     }
   }
