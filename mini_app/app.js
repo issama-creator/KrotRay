@@ -259,6 +259,14 @@
           devicesWordEl.textContent = "устройств";
         }
       }
+      
+      // Показать/скрыть бейдж "БАЗОВЫЙ" только для тарифа "1 месяц" и только при 1 устройстве
+      var badgeBasic = document.getElementById("badge-basic");
+      if (badgeBasic) {
+        var tariff1El = document.getElementById("tariff-1");
+        var isTariff1Selected = tariff1El && tariff1El.classList.contains("tariff-row_selected");
+        badgeBasic.style.display = (selectedDevices === 1 && isTariff1Selected) ? "inline-block" : "none";
+      }
     }
     
     // Функция для сброса и автоматического выбора первого тарифа
@@ -312,6 +320,13 @@
         price = basePrice * selectedDevices;
       }
       selectedTariff.price = price;
+      
+      // Показать/скрыть бейдж "БАЗОВЫЙ" только для тарифа "1 месяц" и только при 1 устройстве
+      var badgeBasic = document.getElementById("badge-basic");
+      if (badgeBasic) {
+        var isTariff1 = card.id === "tariff-1" || selectedTariff.tariffId === "1m";
+        badgeBasic.style.display = (selectedDevices === 1 && isTariff1) ? "inline-block" : "none";
+      }
     }
 
     function setPaymentMethod(method) {
