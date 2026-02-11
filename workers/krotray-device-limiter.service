@@ -1,0 +1,18 @@
+[Unit]
+Description=KrotRay Device Limiter Worker
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/krotray
+Environment="PATH=/opt/krotray/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/krotray"
+ExecStart=/opt/krotray/venv/bin/python workers/device_limiter.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

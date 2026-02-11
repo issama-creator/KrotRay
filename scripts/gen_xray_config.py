@@ -29,7 +29,22 @@ def main():
 
     config = {
         "log": {"loglevel": "warning"},
-        "api": {"tag": "api", "services": ["HandlerService"]},
+        "api": {"tag": "api", "services": ["HandlerService", "StatsService"]},
+        "stats": {},
+        "policy": {
+            "system": {
+                "statsInboundUplink": True,
+                "statsInboundDownlink": True,
+                "statsOutboundUplink": True,
+                "statsOutboundDownlink": True
+            },
+            "levels": {
+                "0": {
+                    "statsUserUplink": True,
+                    "statsUserDownlink": True
+                }
+            }
+        },
         "inbounds": [
             {
                 "tag": "vless-in",

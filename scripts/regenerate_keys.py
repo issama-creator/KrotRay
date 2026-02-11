@@ -96,9 +96,12 @@ def main():
                 db.rollback()
                 return 1
             sub.uuid = new_uuid
+            # Сбросить флаги ограничения устройств при перевыдаче ключа
+            sub.disabled_by_limit = False
+            sub.violation_count = 0
             db.add(sub)
             db.add(server_row)
-            print(f"  @{user.username or '-'} (user_id={user.id}): {old_uuid[:8]}... -> {new_uuid[:8]}...")
+            print(f"  @{user.username or '-'} (user_id={user.id}): {old_uuid[:8]}... -> {new_uuid[:8]}... (флаги сброшены)")
 
         db.commit()
         print("Готово. Пользователям нужно заново скопировать ключ в личном кабинете.")

@@ -206,6 +206,7 @@ def create_payment(
         status="pending",
         tariff_months=months,
         payment_method=body.method,
+        devices=body.devices,
         external_id=yoo_id,
     )
     db.add(payment)
@@ -257,13 +258,14 @@ def webhook(request: dict, db: Session = Depends(get_db)):
         ).scalars().first()
 
         if existing and existing.expires_at and existing.expires_at.replace(tzinfo=timezone.utc) > now:
-            # Активная подписка — только продлить срок, Xray не трогаем
+            # Активная подписка — только продлить срок, обновить allowed_devices, Xray не трогаем
             base = existing.expires_at.replace(tzinfo=timezone.utc) if existing.expires_at.tzinfo is None else existing.expires_at
             expires_at = base + timedelta(days=payment.tariff_months * days_per_month)
             existing.expires_at = expires_at
             existing.status = "active"
+            existing.allowed_devices = payment.devices  # Обновить лимит устройств
             db.commit()
-            logger.info("Subscription extended user_id=%s expires_at=%s", payment.user_id, expires_at)
+            logger.info("Subscription extended user_id=%s expires_at=%s allowed_devices=%d", payment.user_id, expires_at, payment.devices)
         elif existing and existing.uuid and existing.server_id:
             # Просроченная подписка с UUID — вернуть того же пользователя в Xray (enable), продлить срок
             server_row = db.execute(select(Server).where(Server.id == existing.server_id)).scalars().first()
@@ -280,6 +282,9 @@ def webhook(request: dict, db: Session = Depends(get_db)):
                     db.add(server_row)
                     existing.expires_at = now + timedelta(days=payment.tariff_months * days_per_month)
                     existing.status = "active"
+                    existing.allowed_devices = payment.devices  # Обновить лимит устройств
+                    existing.disabled_by_limit = False  # Сбросить флаг отключения
+                    existing.violation_count = 0  # Сбросить счетчик нарушений
                     db.add(existing)
                     db.commit()
                     logger.info(
@@ -331,6 +336,7 @@ def webhook(request: dict, db: Session = Depends(get_db)):
                 tariff_months=payment.tariff_months,
                 uuid=sub_uuid,
                 server_id=sub_server_id,
+                allowed_devices=payment.devices,  # Сохранить лимит устройств из платежа
             )
             db.add(sub)
             db.commit()

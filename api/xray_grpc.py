@@ -62,8 +62,8 @@ def remove_user_from_xray(
     :param grpc_port: порт gRPC API
     :param email: email/идентификатор клиента (как при AddUser)
     :param inbound_tag: тег inbound (по умолчанию из XRAY_INBOUND_TAG)
-    :return: True при успехе
-    :raises Exception: при ошибке gRPC
+    :return: True при успехе или если пользователь не найден (это нормально)
+    :raises Exception: при критической ошибке gRPC
     """
     tag = inbound_tag or XRAY_INBOUND_TAG
     try:
@@ -76,8 +76,14 @@ def remove_user_from_xray(
         )
         return True
     except Exception as e:
-        logger.exception("Xray RemoveUser failed: %s", e)
-        raise
+        # Если пользователь не найден - это нормально (уже удален или никогда не был добавлен)
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "user" in error_msg and "not found" in error_msg:
+            logger.debug("Xray RemoveUser: пользователь не найден (это нормально): server=%s:%s email=%s", host, grpc_port, email)
+            return True
+        # Для других ошибок логируем как предупреждение, но не пробрасываем исключение
+        logger.warning("Xray RemoveUser failed (продолжаем): server=%s:%s email=%s error=%s", host, grpc_port, email, e)
+        return True
 
 
 def _add_user_grpc(
