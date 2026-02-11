@@ -18,40 +18,38 @@ def _ensure_grpc_gen_path():
 
 def get_connections(host: str, grpc_port: int, user_email: str) -> int:
     """
-    Получить количество активных соединений для пользователя через Xray Stats API.
-    Xray считает статистику по email (user_1, user_2, ...), не по UUID.
+    Получить количество активных подключений пользователя через Xray Stats API.
+    Xray не отдаёт счётчик "connections"; используем GetStatsOnlineIpList — число IP = число устройств/сессий.
 
     :param host: хост сервера Xray
     :param grpc_port: порт gRPC API
-    :param user_email: email пользователя (например user_1, user_2)
-    :return: количество активных соединений (0 если ошибка или нет данных)
+    :param user_email: email пользователя (user_1, user_2, ...)
+    :return: количество активных подключений (0 если ошибка или нет данных)
     """
     _ensure_grpc_gen_path()
     try:
         import grpc
         from app.stats.command import command_pb2, command_pb2_grpc
 
-        # Xray хранит статистику по email, не по UUID
-        stats_name = f"user>>>{user_email}>>>connections"
+        # Имя для онлайн-списка IP: user>>>email (как в документации statsonlineiplist)
+        name = f"user>>>{user_email}"
 
         channel = grpc.insecure_channel(f"{host}:{grpc_port}")
         try:
             stub = command_pb2_grpc.StatsServiceStub(channel)
-            request = command_pb2.GetStatsRequest(name=stats_name, reset=False)
+            request = command_pb2.GetStatsRequest(name=name, reset=False)
             try:
-                response = stub.GetStats(request)
+                response = stub.GetStatsOnlineIpList(request)
             except grpc.RpcError as e:
                 if e.code() == grpc.StatusCode.NOT_FOUND:
-                    logger.debug("Stats API: email=%s connections not found (0)", user_email)
+                    logger.debug("Stats API: email=%s online IP list not found (0)", user_email)
                     return 0
                 raise
 
-            if response.stat and response.stat.name == stats_name:
-                connections = response.stat.value
-                logger.debug("Stats API: email=%s connections=%d", user_email, connections)
-                return int(connections)
-            else:
-                return 0
+            ips = getattr(response, "ips", None) or {}
+            count = len(ips)
+            logger.debug("Stats API GetStatsOnlineIpList: email=%s connections(IPs)=%d", user_email, count)
+            return count
         finally:
             channel.close()
     except ImportError as e:
@@ -61,7 +59,7 @@ def get_connections(host: str, grpc_port: int, user_email: str) -> int:
         )
         return 0
     except Exception as e:
-        logger.exception("Xray GetStats failed: server=%s:%s email=%s", host, grpc_port, user_email)
+        logger.exception("Xray GetStatsOnlineIpList failed: server=%s:%s email=%s", host, grpc_port, user_email)
         return 0
 
 
