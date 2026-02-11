@@ -16,50 +16,59 @@ def _ensure_grpc_gen_path():
         sys.path.insert(0, _GRPC_GEN)
 
 
-def get_connections(host: str, grpc_port: int, user_uuid: str) -> int:
+def get_connections(host: str, grpc_port: int, user_email: str) -> int:
     """
-    Получить количество активных соединений для UUID через Xray Stats API.
-    
+    Получить количество активных соединений для пользователя через Xray Stats API.
+    Xray считает статистику по email (user_1, user_2, ...), не по UUID.
+
     :param host: хост сервера Xray
     :param grpc_port: порт gRPC API
-    :param user_uuid: UUID пользователя
+    :param user_email: email пользователя (например user_1, user_2)
     :return: количество активных соединений (0 если ошибка или нет данных)
     """
     _ensure_grpc_gen_path()
     try:
         import grpc
         from app.stats.command import command_pb2, command_pb2_grpc
-        
-        # Имя статистики для connections: "user>>>UUID>>>connections"
-        stats_name = f"user>>>{user_uuid}>>>connections"
-        
+
+        # Xray хранит статистику по email, не по UUID
+        stats_name = f"user>>>{user_email}>>>connections"
+
         channel = grpc.insecure_channel(f"{host}:{grpc_port}")
         try:
             stub = command_pb2_grpc.StatsServiceStub(channel)
             request = command_pb2.GetStatsRequest(name=stats_name, reset=False)
-            response = stub.GetStats(request)
-            
+            try:
+                response = stub.GetStats(request)
+            except grpc.RpcError as e:
+                if e.code() == grpc.StatusCode.NOT_FOUND:
+                    logger.debug("Stats API: email=%s connections not found (0)", user_email)
+                    return 0
+                raise
+
             if response.stat and response.stat.name == stats_name:
                 connections = response.stat.value
-                logger.debug("Stats API: uuid=%s connections=%d", user_uuid, connections)
+                logger.debug("Stats API: email=%s connections=%d", user_email, connections)
                 return int(connections)
             else:
-                logger.warning("Stats API: uuid=%s no stats found (name=%s)", user_uuid, stats_name)
                 return 0
         finally:
             channel.close()
     except ImportError as e:
-        logger.warning("Xray Stats gRPC: proto не найдены. Заглушка: server=%s:%s uuid=%s (%s)", host, grpc_port, user_uuid, e)
+        logger.warning(
+            "Xray Stats gRPC: proto не найдены. Заглушка: server=%s:%s email=%s (%s)",
+            host, grpc_port, user_email, e,
+        )
         return 0
     except Exception as e:
-        logger.exception("Xray GetStats failed: server=%s:%s uuid=%s", host, grpc_port, user_uuid)
+        logger.exception("Xray GetStats failed: server=%s:%s email=%s", host, grpc_port, user_email)
         return 0
 
 
 def disable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_tag: str | None = None) -> bool:
     """
     Отключить пользователя в Xray (disable через AlterInbound).
-    
+
     :param host: хост сервера Xray
     :param grpc_port: порт gRPC API
     :param user_uuid: UUID пользователя
@@ -76,7 +85,7 @@ def disable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_
         from common.protocol import user_pb2
         from common.serial import typed_message_pb2
         from proxy.vless import account_pb2
-        
+
         # VLESS Account с тем же UUID
         vless_account = account_pb2.Account(
             id=user_uuid,
@@ -88,7 +97,7 @@ def disable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_
             value=vless_account.SerializeToString(),
         )
         user = user_pb2.User(level=0, email=email, account=account_typed)
-        
+
         # RemoveUserOperation для отключения
         remove_op = command_pb2.RemoveUserOperation(email=email)
         op_typed = typed_message_pb2.TypedMessage(
@@ -96,7 +105,7 @@ def disable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_
             value=remove_op.SerializeToString(),
         )
         req = command_pb2.AlterInboundRequest(tag=tag, operation=op_typed)
-        
+
         channel = grpc.insecure_channel(f"{host}:{grpc_port}")
         try:
             stub = command_pb2_grpc.HandlerServiceStub(channel)
@@ -119,7 +128,7 @@ def disable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_
 def enable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_tag: str | None = None) -> bool:
     """
     Включить пользователя в Xray (add через AlterInbound).
-    
+
     :param host: хост сервера Xray
     :param grpc_port: порт gRPC API
     :param user_uuid: UUID пользователя
@@ -136,7 +145,7 @@ def enable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_t
         from common.protocol import user_pb2
         from common.serial import typed_message_pb2
         from proxy.vless import account_pb2
-        
+
         # VLESS Account: id=UUID, flow (xtls-rprx-vision), encryption=none
         vless_account = account_pb2.Account(
             id=user_uuid,
@@ -154,7 +163,7 @@ def enable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_t
             value=add_op.SerializeToString(),
         )
         req = command_pb2.AlterInboundRequest(tag=tag, operation=op_typed)
-        
+
         channel = grpc.insecure_channel(f"{host}:{grpc_port}")
         try:
             stub = command_pb2_grpc.HandlerServiceStub(channel)

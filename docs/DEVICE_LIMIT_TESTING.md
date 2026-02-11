@@ -365,6 +365,89 @@ cat /usr/local/etc/xray/config.json | grep -A 10 '"policy"'
 
 ---
 
+## Диагностика: «воркер не ловит» (всегда только «Проверка N подписок»)
+
+Если в логах только `[INFO] Проверка 3 активных подписок` и нет сообщений о превышении лимита, скорее всего **Xray возвращает 0 соединений** для всех UUID.
+
+### Шаг 1. Проверить, что возвращает get_connections (на сервере с ботом)
+
+Подключись с **двух устройств** одним ключом, затем выполни:
+
+```bash
+cd /opt/krotray
+source venv/bin/activate
+python3 -c "
+from db.session import SessionLocal
+from db.models import Subscription, Server
+from sqlalchemy import select
+from services.xray_client import get_connections
+
+db = SessionLocal()
+rows = db.execute(
+    select(Subscription, Server)
+    .join(Server, Subscription.server_id == Server.id)
+    .where(Subscription.status == 'active')
+    .where(Subscription.uuid.isnot(None))
+).all()
+
+for sub, srv in rows:
+    c = get_connections(srv.host, srv.grpc_port, sub.uuid)
+    print(f'Sub {sub.id} uuid={sub.uuid[:8]}... allowed={sub.allowed_devices} connections={c}')
+db.close()
+"
+```
+
+- Если везде **connections=0** при том, что ты реально подключен с 2 устройств — проблема в **конфиге Xray** (см. шаг 2).
+- Если **connections=2** и **allowed=1** — воркер должен через 1–2 минуты поймать и отключить; тогда можно включить подробные логи (шаг 3).
+
+### Шаг 2. Проверить конфиг Xray (на сервере, где крутится Xray)
+
+Конфиг должен быть на **сервере Xray** (не на сервере бота), например: `103.137.251.165` или тот хост, что в таблице `servers`.
+
+```bash
+# На сервере Xray
+grep -A 5 '\"api\"' /usr/local/etc/xray/config.json
+grep -A 10 '\"policy\"' /usr/local/etc/xray/config.json
+```
+
+Должно быть:
+
+- `"services": ["HandlerService", "StatsService"]`
+- В `policy` — секция `"system"` с `statsInboundUplink`, `statsInboundDownlink`, `statsOutboundUplink`, `statsOutboundDownlink: true`
+
+Если этого нет — добавь по инструкции в `docs/xray_config_policy_fix.md`, затем:
+
+```bash
+/usr/local/bin/xray -test -config /usr/local/etc/xray/config.json
+systemctl restart xray
+```
+
+После рестарта Xray подожди 1–2 минуты и снова выполни команду из шага 1 — `connections` должен стать 1 или 2.
+
+### Шаг 3. Включить подробные логи воркера (по каждой подписке)
+
+Чтобы в логах видеть для каждой подписки `connections` и `allowed_devices`, в файле **на сервере** отредактируй `workers/device_limiter.py`:
+
+Найди строку (примерно после `connections = get_connections(...)`):
+
+```python
+        logger.debug(
+            "Subscription %d: uuid=%s connections=%d allowed=%d",
+            ...
+        )
+```
+
+Замени `logger.debug` на `logger.info` и сохрани файл. Затем перезапусти воркер:
+
+```bash
+sudo systemctl restart krotray-device-limiter
+sudo journalctl -u krotray-device-limiter -f
+```
+
+В логах появятся строки вида: `Subscription 1: uuid=... connections=0 allowed=1` — по ним видно, что приходит из Xray.
+
+---
+
 ## Возможные проблемы
 
 ### Worker не запускается:

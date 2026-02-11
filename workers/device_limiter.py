@@ -1,7 +1,7 @@
 """Worker для проверки лимита устройств через Xray Stats API.
 
 Проверяет каждые 60 секунд активные подписки и отключает/включает пользователей
-в зависимости от количества активных соединений.
+в зависимости от количества активных соединений. Xray считает соединения по email (user_1, user_2, ...).
 """
 import logging
 import time
@@ -27,38 +27,38 @@ CHECK_INTERVAL = 60  # секунды
 def check_subscription(subscription: Subscription, db: Session) -> None:
     """
     Проверить одну подписку и применить ограничения при необходимости.
-    
+
     :param subscription: объект подписки из БД
     :param db: сессия БД
     """
     if not subscription.uuid or not subscription.server_id:
         logger.debug("Subscription %d: нет uuid или server_id, пропускаем", subscription.id)
         return
-    
+
     server = db.execute(select(Server).where(Server.id == subscription.server_id)).scalar_one_or_none()
     if not server:
         logger.warning("Subscription %d: server_id=%d не найден", subscription.id, subscription.server_id)
         return
-    
+
     email = f"user_{subscription.user_id}"
-    
+
     try:
-        # Получить количество активных соединений через Stats API
-        connections = get_connections(server.host, server.grpc_port, subscription.uuid)
-        logger.debug(
-            "Subscription %d: uuid=%s connections=%d allowed=%d",
-            subscription.id, subscription.uuid, connections, subscription.allowed_devices
+        # Xray считает соединения по email, не по UUID
+        connections = get_connections(server.host, server.grpc_port, email)
+        logger.info(
+            "Subscription %d: email=%s connections=%d allowed=%d",
+            subscription.id, email, connections, subscription.allowed_devices,
         )
-        
+
         # Проверка превышения лимита
         if connections > subscription.allowed_devices:
             # Увеличиваем счетчик нарушений
             subscription.violation_count += 1
             logger.warning(
                 "Subscription %d: превышение лимита! connections=%d > allowed=%d violation_count=%d",
-                subscription.id, connections, subscription.allowed_devices, subscription.violation_count
+                subscription.id, connections, subscription.allowed_devices, subscription.violation_count,
             )
-            
+
             # Если нарушений >= 2, отключаем пользователя
             if subscription.violation_count >= 2 and not subscription.disabled_by_limit:
                 try:
@@ -69,11 +69,10 @@ def check_subscription(subscription: Subscription, db: Session) -> None:
                         email=email,
                     )
                     subscription.disabled_by_limit = True
-                    # status остается "active", отключение через disabled_by_limit
                     db.commit()
                     logger.info(
                         "Subscription %d: пользователь отключен из-за превышения лимита устройств",
-                        subscription.id
+                        subscription.id,
                     )
                 except Exception as e:
                     logger.exception("Subscription %d: ошибка при отключении пользователя", subscription.id)
@@ -86,9 +85,9 @@ def check_subscription(subscription: Subscription, db: Session) -> None:
                 subscription.violation_count = 0
                 logger.info(
                     "Subscription %d: соединения в норме, violation_count сброшен",
-                    subscription.id
+                    subscription.id,
                 )
-            
+
             # Если пользователь был отключен из-за лимита, включаем обратно
             if subscription.disabled_by_limit:
                 try:
@@ -99,18 +98,17 @@ def check_subscription(subscription: Subscription, db: Session) -> None:
                         email=email,
                     )
                     subscription.disabled_by_limit = False
-                    # status уже "active", просто сбрасываем флаг
                     db.commit()
                     logger.info(
                         "Subscription %d: пользователь автоматически включен (соединения в норме)",
-                        subscription.id
+                        subscription.id,
                     )
                 except Exception as e:
                     logger.exception("Subscription %d: ошибка при включении пользователя", subscription.id)
                     db.rollback()
             else:
                 db.commit()
-                
+
     except Exception as e:
         logger.exception("Subscription %d: ошибка при проверке", subscription.id)
         db.rollback()
@@ -119,13 +117,13 @@ def check_subscription(subscription: Subscription, db: Session) -> None:
 def run_worker() -> None:
     """Основной цикл worker'а."""
     logger.info("Device limiter worker запущен (интервал проверки: %d сек)", CHECK_INTERVAL)
-    
+
     while True:
         try:
             db = SessionLocal()
             try:
                 now = datetime.now(timezone.utc)
-                
+
                 # Получить все активные подписки с UUID и server_id
                 subscriptions = db.execute(
                     select(Subscription)
@@ -134,18 +132,17 @@ def run_worker() -> None:
                     .where(Subscription.uuid.isnot(None))
                     .where(Subscription.server_id.isnot(None))
                 ).scalars().all()
-                
+
                 logger.info("Проверка %d активных подписок", len(subscriptions))
-                
+
                 for subscription in subscriptions:
                     check_subscription(subscription, db)
-                
+
             finally:
                 db.close()
-            
-            # Ждем перед следующей проверкой
+
             time.sleep(CHECK_INTERVAL)
-            
+
         except KeyboardInterrupt:
             logger.info("Worker остановлен пользователем")
             break
