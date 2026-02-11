@@ -38,9 +38,10 @@ def get_connections(host: str, grpc_port: int, user_email: str) -> int:
             stub = command_pb2_grpc.StatsServiceStub(channel)
             request = command_pb2.GetStatsRequest(name=name_with_prefix, reset=False)
 
-            # 1) GetStatsOnlineIpList — число IP = число устройств
+            # 1) GetStatsOnlineIpList — число IP = число устройств. В Xray ключ = user>>>email>>>online
             if hasattr(stub, "GetStatsOnlineIpList"):
-                for name in (name_with_prefix, user_email):
+                name_online = f"{name_with_prefix}>>>online"
+                for name in (name_online, name_with_prefix, user_email):
                     try:
                         req = command_pb2.GetStatsRequest(name=name, reset=False)
                         response = stub.GetStatsOnlineIpList(req)
