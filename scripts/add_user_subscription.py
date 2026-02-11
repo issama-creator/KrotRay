@@ -101,6 +101,7 @@ def main():
             tariff_months=1,
             uuid=sub_uuid,
             server_id=server.id,
+            allowed_devices=1,
         )
         db.add(sub)
         db.commit()
