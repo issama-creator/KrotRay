@@ -32,29 +32,32 @@ def get_connections(host: str, grpc_port: int, user_email: str) -> int:
         import grpc
         from app.stats.command import command_pb2, command_pb2_grpc
 
-        name = f"user>>>{user_email}"
+        name_with_prefix = f"user>>>{user_email}"
         channel = grpc.insecure_channel(f"{host}:{grpc_port}")
         try:
             stub = command_pb2_grpc.StatsServiceStub(channel)
-            request = command_pb2.GetStatsRequest(name=name, reset=False)
+            request = command_pb2.GetStatsRequest(name=name_with_prefix, reset=False)
 
-            # 1) GetStatsOnlineIpList — число IP = число устройств (нужен полный proto и регенерация)
+            # 1) GetStatsOnlineIpList — число IP = число устройств
             if hasattr(stub, "GetStatsOnlineIpList"):
-                try:
-                    response = stub.GetStatsOnlineIpList(request)
-                    ips = getattr(response, "ips", None) or {}
-                    count = len(ips)
-                    logger.debug("Stats API GetStatsOnlineIpList: email=%s connections(IPs)=%d", user_email, count)
-                    return count
-                except grpc.RpcError as e:
-                    if e.code() == grpc.StatusCode.NOT_FOUND:
-                        return 0
-                    raise
+                for name in (name_with_prefix, user_email):
+                    try:
+                        req = command_pb2.GetStatsRequest(name=name, reset=False)
+                        response = stub.GetStatsOnlineIpList(req)
+                        ips = getattr(response, "ips", None) or {}
+                        count = len(ips)
+                        logger.debug("Stats API GetStatsOnlineIpList: name=%s connections(IPs)=%d", name, count)
+                        return count
+                    except grpc.RpcError as e:
+                        if e.code() == grpc.StatusCode.NOT_FOUND:
+                            continue
+                        raise
+                return 0
 
             # 2) GetStatsOnline("user>>>email>>>online") — один счётчик онлайн (если есть в стабе)
             if hasattr(stub, "GetStatsOnline"):
                 try:
-                    req_online = command_pb2.GetStatsRequest(name=f"{name}>>>online", reset=False)
+                    req_online = command_pb2.GetStatsRequest(name=f"{name_with_prefix}>>>online", reset=False)
                     resp = stub.GetStatsOnline(req_online)
                     if resp.stat and resp.stat.name:
                         logger.debug("Stats API GetStatsOnline: email=%s value=%s", user_email, resp.stat.value)
@@ -66,7 +69,7 @@ def get_connections(host: str, grpc_port: int, user_email: str) -> int:
 
             # 3) GetStats("user>>>email>>>connections") — в Xray часто нет такого счётчика
             try:
-                req_conn = command_pb2.GetStatsRequest(name=f"{name}>>>connections", reset=False)
+                req_conn = command_pb2.GetStatsRequest(name=f"{name_with_prefix}>>>connections", reset=False)
                 response = stub.GetStats(req_conn)
                 if response.stat and response.stat.name == req_conn.name:
                     return int(response.stat.value)
@@ -87,6 +90,27 @@ def get_connections(host: str, grpc_port: int, user_email: str) -> int:
     except Exception as e:
         logger.exception("Xray get_connections failed: server=%s:%s email=%s", host, grpc_port, user_email)
         return 0
+
+
+def get_all_online_users(host: str, grpc_port: int) -> list[str]:
+    """
+    Список имён пользователей, у которых есть активные IP (для отладки формата name).
+    """
+    _ensure_grpc_gen_path()
+    try:
+        import grpc
+        from app.stats.command import command_pb2, command_pb2_grpc
+        channel = grpc.insecure_channel(f"{host}:{grpc_port}")
+        try:
+            stub = command_pb2_grpc.StatsServiceStub(channel)
+            if hasattr(stub, "GetAllOnlineUsers"):
+                resp = stub.GetAllOnlineUsers(command_pb2.GetAllOnlineUsersRequest())
+                return list(getattr(resp, "users", []) or [])
+        finally:
+            channel.close()
+    except Exception:
+        pass
+    return []
 
 
 def disable_user(host: str, grpc_port: int, user_uuid: str, email: str, inbound_tag: str | None = None) -> bool:
