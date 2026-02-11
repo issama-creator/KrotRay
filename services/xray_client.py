@@ -93,6 +93,34 @@ def get_connections(host: str, grpc_port: int, user_email: str) -> int:
         return 0
 
 
+def get_online_ips(host: str, grpc_port: int, user_email: str) -> dict[str, int]:
+    """
+    Получить словарь IP → unix timestamp последней активности по пользователю (user_X).
+    Пустой словарь, если нет данных или ошибка.
+    """
+    _ensure_grpc_gen_path()
+    try:
+        import grpc
+        from app.stats.command import command_pb2, command_pb2_grpc
+        name_online = f"user>>>{user_email}>>>online"
+        channel = grpc.insecure_channel(f"{host}:{grpc_port}")
+        try:
+            stub = command_pb2_grpc.StatsServiceStub(channel)
+            if not hasattr(stub, "GetStatsOnlineIpList"):
+                return {}
+            req = command_pb2.GetStatsRequest(name=name_online, reset=False)
+            response = stub.GetStatsOnlineIpList(req)
+            ips = getattr(response, "ips", None)
+            if ips is None:
+                return {}
+            # protobuf map<string,int64> в Python — dict
+            return dict(ips)
+        finally:
+            channel.close()
+    except Exception:
+        return {}
+
+
 def get_all_online_users(host: str, grpc_port: int) -> list[str]:
     """
     Список имён пользователей, у которых есть активные IP (для отладки формата name).
