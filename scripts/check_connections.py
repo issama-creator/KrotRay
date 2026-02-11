@@ -3,7 +3,9 @@
 То, что считает Xray GetStatsOnlineIpList — сколько устройств онлайн у каждого user_X.
 
 Запуск: python scripts/check_connections.py
+        python scripts/check_connections.py --debug   # + список онлайн из Xray (формат name)
 """
+import argparse
 import os
 import sys
 from datetime import datetime, timezone
@@ -13,10 +15,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import select
 from db.models import Server, Subscription
 from db.session import SessionLocal
-from services.xray_client import get_connections
+from services.xray_client import get_connections, get_all_online_users
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Показать connections по подпискам")
+    parser.add_argument("--debug", action="store_true", help="Показать список онлайн-пользователей из Xray (формат name)")
+    args = parser.parse_args()
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
@@ -32,6 +37,11 @@ def main():
         if not rows:
             print("Нет активных подписок с сервером.")
             return 0
+
+        if args.debug:
+            sub0, srv0 = rows[0]
+            online = get_all_online_users(srv0.host, srv0.grpc_port)
+            print(f"\n[Xray GetAllOnlineUsers] {srv0.host}:{srv0.grpc_port} → {online!r}\n")
 
         print(f"\nПодключения (IP) по подпискам — {len(rows)} шт.\n")
         print(f"{'sub_id':<8} {'email':<12} {'connections':<12} {'allowed':<8} {'server'}")
