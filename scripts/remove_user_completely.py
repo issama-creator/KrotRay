@@ -11,10 +11,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from api.xray_grpc import remove_user_from_xray
 from bot.config import XRAY_INBOUND_TAG
-from db.models import Server, Subscription, User
+from db.models import Payment, Server, Subscription, User
 from db.session import SessionLocal
 
 
@@ -63,9 +63,13 @@ def main():
 
         saved_telegram_id = user.telegram_id
         saved_username = user.username or args.username or "USERNAME"
+
+        # Сначала удаляем подписки и платежи (user_id NOT NULL), потом пользователя
+        n_subs = db.execute(delete(Subscription).where(Subscription.user_id == user.id)).rowcount
+        n_pays = db.execute(delete(Payment).where(Payment.user_id == user.id)).rowcount
         db.delete(user)
         db.commit()
-        print(f"  Удалён из БД: user id={user.id}, подписки и платежи (CASCADE)")
+        print(f"  Удалён из БД: user id={user.id}, подписок={n_subs}, платежей={n_pays}")
         print("Готово. Чтобы добавить снова с 1 устройством:")
         print(f"  python scripts/add_user_subscription.py {saved_username} --telegram-id {saved_telegram_id} --days 30")
     except Exception as e:
