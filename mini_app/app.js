@@ -23,7 +23,6 @@
 
   var selectedTariff = { tariffId: "1m", months: 1, price: 100 };
   var selectedPaymentMethod = "sbp"; // "sbp" | "card"
-  var selectedDevices = 1; // 1-5 устройств
 
   function formatDate(isoStr) {
     if (!isoStr) return "";
@@ -64,60 +63,24 @@
       var el = document.getElementById("payment-amount");
       var summaryEl = document.getElementById("payment-summary-info");
       if (el) {
-        // Берем цену из выбранного тарифа с учетом текущего количества устройств
+        // Цена = базовая цена тарифа (1 ключ = 1 устройство)
         var selectedRow = document.querySelector(".tariff-row_selected");
         var price = null;
-        
-        // Сначала пытаемся взять из data-price (должна быть актуальной после updatePrices)
         if (selectedRow && selectedRow.dataset.price) {
           price = parseInt(selectedRow.dataset.price, 10);
         }
-        
-        // Если цена не найдена или некорректна, пересчитываем из базовой цены
         if (isNaN(price) || price <= 0) {
-          var basePrice = 100; // значение по умолчанию
-          if (selectedRow && selectedRow.dataset.basePrice) {
-            basePrice = parseInt(selectedRow.dataset.basePrice, 10);
-          } else {
-            // Определяем базовую цену по тарифу
-            var tariffId = selectedTariff.tariffId || (selectedTariff.months === 1 ? "1m" : (selectedTariff.months === 3 ? "3m" : "6m"));
-            var basePrices = {
-              "1m": 100,
-              "3m": 250,
-              "6m": 550
-            };
-            basePrice = basePrices[tariffId] || 100;
-          }
-          // Пересчитываем цену: базовая цена * количество устройств
-          price = basePrice * (selectedDevices || 1);
+          var basePrice = selectedRow && selectedRow.dataset.basePrice
+            ? parseInt(selectedRow.dataset.basePrice, 10) : (selectedTariff.months === 3 ? 250 : selectedTariff.months === 6 ? 550 : 100);
+          price = basePrice;
         }
-        
-        // Проверяем, что цена соответствует ожидаемой (базовая * устройства)
-        // Это защита от устаревших данных
-        if (selectedRow && selectedRow.dataset.basePrice) {
-          var expectedBasePrice = parseInt(selectedRow.dataset.basePrice, 10);
-          var expectedPrice = expectedBasePrice * (selectedDevices || 1);
-          // Если цена не соответствует ожидаемой, используем пересчитанную
-          if (Math.abs(price - expectedPrice) > 0.01) {
-            price = expectedPrice;
-            // Обновляем data-price для будущих использований
-            if (selectedRow) {
-              selectedRow.dataset.price = price;
-            }
-          }
-        }
-        
         el.textContent = price + " ₽";
-        // Обновляем selectedTariff для корректной передачи на сервер
         selectedTariff.price = price;
       }
-      // Обновляем контекстную информацию (месяцы • устройства)
       if (summaryEl) {
         var months = selectedTariff.months || 1;
-        var devices = selectedDevices || 1;
         var monthsText = months === 1 ? "1 месяц" : (months === 3 ? "3 месяца" : "6 месяцев");
-        var devicesText = devices === 1 ? "1 устройство" : (devices >= 2 && devices <= 4 ? devices + " устройства" : devices + " устройств");
-        summaryEl.textContent = monthsText + " • " + devicesText;
+        summaryEl.textContent = monthsText + " • 1 устройство";
       }
     }
   }
@@ -215,91 +178,29 @@
     var tariff6 = document.getElementById("tariff-6");
     var btnBuyKeyTop = document.getElementById("btn-buy-key-top");
     
-    // Функция для пересчета цен в зависимости от количества устройств
+    // Цены тарифов: 1 ключ = 1 устройство (фиксированные)
     function updatePrices() {
-      var basePrices = {
-        "1m": 100,
-        "3m": 250,
-        "6m": 550
-      };
-      
-      // Цена = базовая цена * количество устройств
+      var basePrices = { "1m": 100, "3m": 250, "6m": 550 };
       Object.keys(basePrices).forEach(function(tariffId) {
-        var basePrice = basePrices[tariffId];
-        var price = basePrice * selectedDevices;
+        var price = basePrices[tariffId];
         var priceEl = document.getElementById("price-" + tariffId);
         if (priceEl) priceEl.textContent = price + " ₽";
-        
-        // Обновить data-price для тарифа
         var tariffEl = document.getElementById("tariff-" + tariffId);
         if (tariffEl) {
           tariffEl.dataset.price = price;
-          // Если это выбранный тариф, обновить selectedTariff
-          if (tariffEl.classList.contains("tariff-row_selected")) {
-            selectedTariff.price = price;
-          }
+          if (tariffEl.classList.contains("tariff-row_selected")) selectedTariff.price = price;
         }
       });
-      
-      // Обновить экономию для 3 месяцев (базовая экономия * количество устройств)
-      var savings3m = 50 * selectedDevices;
       var savingsEl = document.getElementById("savings-3m");
-      if (savingsEl) savingsEl.textContent = savings3m + " ₽";
-      
-      // Обновить текст количества устройств
-      var devicesCountEl = document.getElementById("selected-devices-count");
-      var devicesWordEl = document.getElementById("devices-word");
-      if (devicesCountEl) devicesCountEl.textContent = selectedDevices;
-      if (devicesWordEl) {
-        if (selectedDevices === 1) {
-          devicesWordEl.textContent = "устройство";
-        } else if (selectedDevices >= 2 && selectedDevices <= 4) {
-          devicesWordEl.textContent = "устройства";
-        } else {
-          devicesWordEl.textContent = "устройств";
-        }
-      }
-      
-      // Показать/скрыть бейдж "БАЗОВЫЙ" только для тарифа "1 месяц" и только при 1 устройстве
+      if (savingsEl) savingsEl.textContent = "50 ₽";
       var badgeBasic = document.getElementById("badge-basic");
       if (badgeBasic) {
         var tariff1El = document.getElementById("tariff-1");
         var isTariff1Selected = tariff1El && tariff1El.classList.contains("tariff-row_selected");
-        badgeBasic.style.display = (selectedDevices === 1 && isTariff1Selected) ? "inline-block" : "none";
+        badgeBasic.style.display = isTariff1Selected ? "inline-block" : "none";
       }
     }
     
-    // Функция для сброса и автоматического выбора первого тарифа
-    function resetTariffSelection() {
-      document.querySelectorAll(".tariff-row").forEach(function(row) {
-        row.classList.remove("tariff-row_selected");
-      });
-      // Автоматически выбираем первый тариф (1 месяц) визуально
-      var firstTariff = document.getElementById("tariff-1");
-      if (firstTariff) {
-        firstTariff.classList.add("tariff-row_selected");
-        setSelected(firstTariff);
-      } else {
-        // Если элемент не найден, просто обновляем selectedTariff
-        selectedTariff.tariffId = "1m";
-        selectedTariff.months = 1;
-        selectedTariff.price = 100 * selectedDevices;
-      }
-    }
-    
-    // Обработка выбора количества устройств
-    document.querySelectorAll(".devices-switcher__item").forEach(function(item) {
-      item.onclick = function() {
-        tg.HapticFeedback && tg.HapticFeedback.selectionChanged();
-        document.querySelectorAll(".devices-switcher__item").forEach(function(i) {
-          i.classList.remove("devices-switcher__item_active");
-        });
-        this.classList.add("devices-switcher__item_active");
-        selectedDevices = parseInt(this.dataset.devices, 10);
-        resetTariffSelection(); // Сбрасываем выбор тарифа
-        updatePrices();
-      };
-    });
     var btnTariffsBack = document.getElementById("btn-tariffs-back");
     var btnTariffsNext = document.getElementById("btn-tariffs-next");
     var btnPaymentBack = document.getElementById("btn-payment-back");
@@ -315,17 +216,13 @@
       selectedTariff.months = parseInt(card.dataset.months, 10);
       var price = parseInt(card.dataset.price, 10);
       if (isNaN(price) || price <= 0) {
-        // Если цена не установлена, вычисляем из базовой цены
-        var basePrice = parseInt(card.dataset.basePrice, 10) || 100;
-        price = basePrice * selectedDevices;
+        price = parseInt(card.dataset.basePrice, 10) || 100;
       }
       selectedTariff.price = price;
-      
-      // Показать/скрыть бейдж "БАЗОВЫЙ" только для тарифа "1 месяц" и только при 1 устройстве
       var badgeBasic = document.getElementById("badge-basic");
       if (badgeBasic) {
         var isTariff1 = card.id === "tariff-1" || selectedTariff.tariffId === "1m";
-        badgeBasic.style.display = (selectedDevices === 1 && isTariff1) ? "inline-block" : "none";
+        badgeBasic.style.display = isTariff1 ? "inline-block" : "none";
       }
     }
 
@@ -421,23 +318,6 @@
           actualPrice = selectedTariff.price || 100;
         }
         
-        // Логирование для отладки
-        console.log("Sending payment request:", {
-          tariff: tariffId,
-          method: selectedPaymentMethod,
-          devices: selectedDevices,
-          price: actualPrice,
-          selectedTariff: selectedTariff,
-          selectedRow: selectedRow ? {
-            dataset: {
-              tariffId: selectedRow.dataset.tariffId,
-              months: selectedRow.dataset.months,
-              basePrice: selectedRow.dataset.basePrice,
-              price: selectedRow.dataset.price
-            }
-          } : null
-        });
-        
         var initData = tg.initData || "";
         btnPay.disabled = true;
         fetch(apiBase + "/api/payments/create", {
@@ -449,8 +329,8 @@
           body: JSON.stringify({ 
             tariff: tariffId, 
             method: selectedPaymentMethod, 
-            devices: selectedDevices,
-            price: actualPrice  // Отправляем рассчитанную цену, которую видит пользователь
+            devices: 1,
+            price: actualPrice
           }),
         })
           .then(function (res) {

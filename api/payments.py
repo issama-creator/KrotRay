@@ -85,37 +85,29 @@ def create_payment(
     if body.method not in ("sbp", "card"):
         logger.error("Invalid method: %s", body.method)
         raise HTTPException(status_code=400, detail=f"Неверный method: {body.method}. Доступны: sbp, card")
-    if not (1 <= body.devices <= 5):
-        raise HTTPException(status_code=400, detail="devices должно быть от 1 до 5")
-    
+    # Всегда 1 ключ = 1 устройство (MVP)
+    devices = 1
     months, base_amount_rub = TARIFFS[body.tariff]
-    # Ожидаемая цена = базовая цена * количество устройств
-    expected_amount_rub = base_amount_rub * body.devices
+    expected_amount_rub = base_amount_rub * devices
     
     # Используем цену, переданную из UI (которую видит пользователь)
     # Но проверяем, что она соответствует ожидаемой (с небольшой погрешностью для округления)
     if body.price is not None and body.price > 0:
         if abs(body.price - expected_amount_rub) > 0.01:
             logger.warning(
-                "Price mismatch: UI sent price=%.2f, but expected %.2f (tariff=%s, devices=%d, base=%.2f)",
-                body.price, expected_amount_rub, body.tariff, body.devices, base_amount_rub
+                "Price mismatch: UI sent price=%.2f, expected %.2f (tariff=%s)",
+                body.price, expected_amount_rub, body.tariff
             )
-            # Используем ожидаемую цену для безопасности
             amount_rub = expected_amount_rub
         else:
-            # Используем цену из UI
             amount_rub = body.price
     else:
-        # Если цена не передана или некорректна, используем ожидаемую
-        logger.info("Price not provided or invalid, using calculated price: %.2f", expected_amount_rub)
         amount_rub = expected_amount_rub
     
     amount_str = f"{amount_rub:.2f}"
-    
-    # Логирование для отладки
     logger.info(
-        "CREATE PAYMENT: tariff=%s, devices=%d, base_price=%.2f, ui_price=%.2f, final_amount=%.2f, method=%s",
-        body.tariff, body.devices, base_amount_rub, body.price, amount_rub, body.method
+        "CREATE PAYMENT: tariff=%s, amount=%.2f, method=%s",
+        body.tariff, amount_rub, body.method
     )
 
     if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
@@ -142,7 +134,7 @@ def create_payment(
             "amount": {"value": amount_str, "currency": "RUB"},
             "confirmation": {"type": "redirect", "return_url": PAYMENT_RETURN_URL},
             "capture": True,
-            "description": f"KrotVPN {months} мес. · {body.devices} {'устройство' if body.devices == 1 else ('устройства' if 2 <= body.devices <= 4 else 'устройств')}",
+            "description": f"KrotRay {months} мес. · 1 устройство",
         }
         if with_method:
             payment_method_type = "sbp" if body.method == "sbp" else "bank_card"
@@ -206,7 +198,7 @@ def create_payment(
         status="pending",
         tariff_months=months,
         payment_method=body.method,
-        devices=body.devices,
+        devices=devices,
         external_id=yoo_id,
     )
     db.add(payment)
