@@ -79,8 +79,7 @@
       }
       if (summaryEl) {
         var months = selectedTariff.months || 1;
-        var monthsText = months === 1 ? "1 месяц" : (months === 3 ? "3 месяца" : "6 месяцев");
-        summaryEl.textContent = monthsText + " • 1 устройство";
+        summaryEl.textContent = "доступ на " + months + " мес";
       }
     }
   }
@@ -193,12 +192,6 @@
       });
       var savingsEl = document.getElementById("savings-3m");
       if (savingsEl) savingsEl.textContent = "50 ₽";
-      var badgeBasic = document.getElementById("badge-basic");
-      if (badgeBasic) {
-        var tariff1El = document.getElementById("tariff-1");
-        var isTariff1Selected = tariff1El && tariff1El.classList.contains("tariff-row_selected");
-        badgeBasic.style.display = isTariff1Selected ? "inline-block" : "none";
-      }
     }
     
     var btnTariffsBack = document.getElementById("btn-tariffs-back");
@@ -219,11 +212,6 @@
         price = parseInt(card.dataset.basePrice, 10) || 100;
       }
       selectedTariff.price = price;
-      var badgeBasic = document.getElementById("badge-basic");
-      if (badgeBasic) {
-        var isTariff1 = card.id === "tariff-1" || selectedTariff.tariffId === "1m";
-        badgeBasic.style.display = isTariff1 ? "inline-block" : "none";
-      }
     }
 
     function setPaymentMethod(method) {
