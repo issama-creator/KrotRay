@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from db.session import SessionLocal
 from db.models import Server, Subscription
-from services.xray_client import get_connections, disable_user, enable_user
+from services.xray_client import get_connections, get_online_ips, disable_user, enable_user
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,11 +52,16 @@ def check_subscription(subscription: Subscription, db: Session) -> None:
 
         # Проверка превышения лимита
         if connections > subscription.allowed_devices:
+            # Получаем список IP для логирования
+            ips_map = get_online_ips(server.host, server.grpc_port, email)
+            ips_list = list(ips_map.keys()) if ips_map else []
+            ips_str = ", ".join(ips_list) if ips_list else "нет данных"
+            
             # Увеличиваем счетчик нарушений
             subscription.violation_count += 1
             logger.warning(
-                "Subscription %d: превышение лимита! connections=%d > allowed=%d violation_count=%d",
-                subscription.id, connections, subscription.allowed_devices, subscription.violation_count,
+                "Subscription %d: превышение лимита! connections=%d > allowed=%d violation_count=%d IPs=[%s]",
+                subscription.id, connections, subscription.allowed_devices, subscription.violation_count, ips_str,
             )
 
             # Если нарушений >= 2, отключаем пользователя
