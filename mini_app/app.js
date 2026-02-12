@@ -79,7 +79,7 @@
       }
       if (summaryEl) {
         var months = selectedTariff.months || 1;
-        summaryEl.textContent = "доступ на " + months + " мес";
+        summaryEl.textContent = months + " мес";
       }
     }
   }

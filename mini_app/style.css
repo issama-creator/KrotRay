@@ -768,15 +768,15 @@ body {
 
 .tariff-row__badge {
   display: inline-block;
-  margin-left: 8px;
-  padding: 1px 5px;
+  margin-left: 6px;
+  padding: 1px 4px;
   background: #2ED47A;
   color: #0B1F14;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-radius: 4px;
+  letter-spacing: 0.04em;
+  border-radius: 3px;
   vertical-align: middle;
 }
 
@@ -802,6 +802,7 @@ body {
   font-size: 16px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.04em;
 }
 
 .buy-section {
