@@ -10,7 +10,7 @@
 import argparse
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -70,9 +70,15 @@ def main():
             print(f"{sub.id:<8} {email:<12} {c:<12} {sub.allowed_devices:<8} {srv.host}:{srv.grpc_port}")
             if args.ips and c > 0:
                 ips_map = get_online_ips(srv.host, srv.grpc_port, email)
+                msk_tz = timezone(timedelta(hours=3))  # МСК = UTC+3
                 for ip, ts in ips_map.items():
-                    dt = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC") if ts else "—"
-                    print(f"           → {ip}  (последняя активность: {dt})")
+                    if ts:
+                        dt_utc = datetime.fromtimestamp(ts, tz=timezone.utc)
+                        dt_msk = dt_utc.astimezone(msk_tz)
+                        dt_str = dt_msk.strftime("%Y-%m-%d %H:%M:%S MSK")
+                    else:
+                        dt_str = "—"
+                    print(f"           → {ip}  (последняя активность: {dt_str})")
 
         print("-" * 55)
     finally:
