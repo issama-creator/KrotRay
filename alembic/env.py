@@ -10,7 +10,15 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 from db.base import Base
-from db.models import Payment, Server, Subscription, User  # noqa: F401
+from db.models import (  # noqa: F401
+    CpServer,
+    CpUser,
+    Device,
+    Payment,
+    Server,
+    Subscription,
+    User,
+)
 
 target_metadata = Base.metadata
 

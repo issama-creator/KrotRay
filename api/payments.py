@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.auth import get_or_create_user, verify_init_data
+from api.cp_subscription_sync import sync_cp_after_payment_success
 from api.server import get_least_loaded_server
 from api.xray_grpc import add_user_to_xray
 from bot.config import PAYMENT_RETURN_URL, YOOKASSA_SECRET_KEY, YOOKASSA_SHOP_ID
@@ -333,5 +334,10 @@ def webhook(request: dict, db: Session = Depends(get_db)):
             db.add(sub)
             db.commit()
             logger.info("Subscription created user_id=%s expires_at=%s server_id=%s", payment.user_id, expires_at, sub_server_id)
+
+        # Flutter VPN: то же продление по telegram_id (cp_users), отдельная сессия
+        pay_user = db.get(User, payment.user_id)
+        if pay_user and pay_user.telegram_id:
+            sync_cp_after_payment_success(int(pay_user.telegram_id), payment.tariff_months)
 
     return {"ok": True}
