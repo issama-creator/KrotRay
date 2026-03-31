@@ -18,6 +18,7 @@ class CpServer(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     ip: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    group_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     public_key: Mapped[str] = mapped_column(Text, nullable=False)
     short_id: Mapped[str] = mapped_column(String(64), nullable=False)
     sni: Mapped[str] = mapped_column(String(255), nullable=False)

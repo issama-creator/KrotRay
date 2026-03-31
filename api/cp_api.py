@@ -65,11 +65,12 @@ def register(body: RegisterBody, db: Session = Depends(get_db)) -> RegisterRespo
         raise HTTPException(status_code=400, detail="platform must be android or ios")
     did = _parse_uuid(body.device_id)
     did_s = str(did)
-    existing = db.scalar(select(Device).where(Device.device_id == did_s))
+    existing = db.scalar(
+        select(Device).options(joinedload(Device.user)).where(Device.device_id == did_s),
+    )
     if existing:
-        return RegisterResponse(
-            subscription_until=existing.subscription_until.isoformat(),
-        )
+        eff = effective_subscription_until(existing)
+        return RegisterResponse(subscription_until=eff.isoformat())
     user = CpUser()
     db.add(user)
     db.flush()
@@ -155,11 +156,94 @@ def _pick_server(
     return db.scalars(q).first()
 
 
+def _ensure_test_servers_if_empty(db: Session) -> None:
+    total = db.scalar(select(func.count()).select_from(CpServer)) or 0
+    if total > 0:
+        return
+    db.add_all(
+        [
+            CpServer(
+                ip="fake-nl",
+                role=ROLE_NL,
+                group_id="g1",
+                public_key="fake_key",
+                short_id="abcd",
+                sni="fake.nl",
+                path="/",
+                max_users=100,
+                current_users=0,
+                active=True,
+            ),
+            CpServer(
+                ip="fake-bridge",
+                role=ROLE_STANDARD,
+                group_id="g1",
+                public_key="fake_key",
+                short_id="abcd",
+                sni="fake.bridge",
+                path="/",
+                max_users=500,
+                current_users=0,
+                active=True,
+            ),
+        ]
+    )
+    db.commit()
+    logger.info("Seeded test cp_servers: fake-nl + fake-bridge")
+
+
+def _build_test_config(nl: CpServer) -> dict:
+    return {
+        "log": {"loglevel": "warning"},
+        "outbounds": [
+            {
+                "protocol": "vless",
+                "settings": {
+                    "vnext": [
+                        {
+                            "address": nl.ip,
+                            "port": 443,
+                            "users": [
+                                {
+                                    "id": "11111111-1111-1111-1111-111111111111",
+                                    "encryption": "none",
+                                    "flow": "xtls-rprx-vision",
+                                }
+                            ],
+                        }
+                    ]
+                },
+                "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "realitySettings": {
+                        "publicKey": nl.public_key,
+                        "shortId": nl.short_id,
+                    },
+                },
+            }
+        ],
+    }
+
+
 @router.get("/config")
 def get_config(
-    device_id: Annotated[str, Query(..., description="UUID устройства")],
+    device_id: Annotated[str | None, Query(description="UUID устройства")] = None,
     db: Session = Depends(get_db),
 ) -> dict:
+    # Быстрый тестовый режим: /config без параметров возвращает конфиг без проверки подписки.
+    if not device_id:
+        _ensure_test_servers_if_empty(db)
+        nl = db.scalar(
+            select(CpServer)
+            .where(CpServer.role == ROLE_NL)
+            .where(CpServer.active.is_(True))
+            .order_by(CpServer.id.asc())
+        )
+        if not nl:
+            raise HTTPException(status_code=503, detail="no nl server")
+        return _build_test_config(nl)
+
     did_s = str(_parse_uuid(device_id))
     device = db.scalar(
         select(Device).options(joinedload(Device.user)).where(Device.device_id == did_s),
