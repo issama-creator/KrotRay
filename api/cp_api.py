@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import logging
+import random
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, nulls_last, select
+from sqlalchemy import Float, cast, func, nulls_last, select
 from sqlalchemy.orm import Session, joinedload
 
 from api.cp_subscription_sync import effective_subscription_until
@@ -28,6 +30,24 @@ ROLE_STANDARD = "standard_bridge"
 ROLE_BYPASS = "bypass_bridge"
 PLAN_STANDARD = "standard"
 PLAN_BYPASS = "bypass"
+# Чуть больше интервала пинга Flutter (3–4 мин), чтобы не мигать «офлайн» из-за джиттера сети.
+TUNNEL_ACTIVE_GRACE = timedelta(minutes=5)
+
+# Балансировка cp_servers (схема devices и JSON ответа /config не меняются).
+# max_users — технический максимум; реальную «заполненность» держим примерно 70–80% от него.
+# Отдаём узлы только пока (current_users/max_users) < 0.8 — запас, если current_users неточный.
+_CP_LOAD_CAP = 0.8
+_CP_TOP_K = 3
+
+
+def _load_percent(current_users: int, max_users: int) -> float:
+    if max_users <= 0:
+        return 0.0
+    return round(100.0 * float(current_users) / float(max_users), 2)
+
+
+def _cp_no_servers_503() -> JSONResponse:
+    return JSONResponse(status_code=503, content={"error": "no available servers"})
 
 
 def get_db():
@@ -50,6 +70,13 @@ class RegisterResponse(BaseModel):
 class AttachBody(BaseModel):
     device_id: str
     telegram_id: int
+
+
+class VpnHeartbeatBody(BaseModel):
+    """Пинг с клиента: пока VPN включён — раз в 3–4 мин; connected=false при явном отключении."""
+
+    device_id: str = Field(..., min_length=1)
+    connected: bool = True
 
 
 def _parse_uuid(s: str) -> uuid.UUID:
@@ -139,21 +166,26 @@ def attach_telegram(body: AttachBody, db: Session = Depends(get_db)) -> dict:
     return {"ok": True, "subscription_until": eff.isoformat()}
 
 
-def _pick_server(
-    db: Session,
-    role: str,
-) -> CpServer | None:
+def _pick_server(db: Session, role: str) -> CpServer | None:
+    """
+    Фильтр: active, current_users < max_users, load < _CP_LOAD_CAP (80%).
+    ORDER BY load ASC, latency; LIMIT 3; случайный из трёх — anti-spike.
+    """
+    raw_load = cast(CpServer.current_users, Float) / cast(CpServer.max_users, Float)
     q = (
         select(CpServer)
         .where(CpServer.role == role)
         .where(CpServer.active.is_(True))
+        .where(CpServer.max_users > 0)
         .where(CpServer.current_users < CpServer.max_users)
-        .order_by(CpServer.current_users.asc(), nulls_last(CpServer.latency.asc()))
+        .where(raw_load < _CP_LOAD_CAP)
+        .order_by(raw_load.asc(), nulls_last(CpServer.latency.asc()))
+        .limit(_CP_TOP_K)
     )
-    bind = db.get_bind()
-    if bind is not None and bind.dialect.name != "sqlite":
-        q = q.with_for_update(skip_locked=True)
-    return db.scalars(q).first()
+    rows = list(db.scalars(q).all())
+    if not rows:
+        return None
+    return random.choice(rows)
 
 
 def _ensure_test_servers_if_empty(db: Session) -> None:
@@ -234,10 +266,18 @@ def get_config(
     # Быстрый тестовый режим: /config без параметров возвращает конфиг без проверки подписки.
     if not device_id:
         _ensure_test_servers_if_empty(db)
-        # Как в боевом /config: наименьший current_users, затем latency
         nl = _pick_server(db, ROLE_NL)
         if not nl:
-            raise HTTPException(status_code=503, detail="no nl server")
+            return _cp_no_servers_503()
+        logger.info(
+            "cp_pick test: role=nl server_id=%s current_users=%s max_users=%s load_percent=%s",
+            nl.id,
+            nl.current_users,
+            nl.max_users,
+            _load_percent(nl.current_users, nl.max_users),
+        )
+        nl.current_users += 1
+        db.commit()
         return _build_test_config(nl)
 
     did_s = str(_parse_uuid(device_id))
@@ -257,7 +297,22 @@ def get_config(
         bridge = _pick_server(db, bridge_role)
         nl = _pick_server(db, ROLE_NL)
         if not bridge or not nl:
-            raise HTTPException(status_code=503, detail="no capacity")
+            return _cp_no_servers_503()
+        logger.info(
+            "cp_pick: role=%s server_id=%s current_users=%s max_users=%s load_percent=%s",
+            bridge_role,
+            bridge.id,
+            bridge.current_users,
+            bridge.max_users,
+            _load_percent(bridge.current_users, bridge.max_users),
+        )
+        logger.info(
+            "cp_pick: role=nl server_id=%s current_users=%s max_users=%s load_percent=%s",
+            nl.id,
+            nl.current_users,
+            nl.max_users,
+            _load_percent(nl.current_users, nl.max_users),
+        )
         bridge.current_users += 1
         nl.current_users += 1
         cfg = build_client_config(bridge, nl, device)
@@ -271,6 +326,31 @@ def get_config(
         raise HTTPException(status_code=500, detail="config error") from None
 
     return cfg
+
+
+@router.post("/vpn-heartbeat")
+def vpn_heartbeat(body: VpnHeartbeatBody, db: Session = Depends(get_db)) -> dict:
+    """Flutter: при активном туннеле вызывать каждые 3–4 мин; connected=false — сброс метки в БД."""
+    did_s = str(_parse_uuid(body.device_id))
+    device = db.scalar(
+        select(Device).options(joinedload(Device.user)).where(Device.device_id == did_s),
+    )
+    if not device:
+        raise HTTPException(status_code=404, detail="device not found")
+    now = datetime.now(timezone.utc)
+    if effective_subscription_until(device) < now:
+        raise HTTPException(status_code=403, detail="subscription expired")
+    if body.connected:
+        device.tunnel_last_seen_at = now
+    else:
+        device.tunnel_last_seen_at = None
+    db.commit()
+    return {
+        "ok": True,
+        "tunnel_last_seen_at": device.tunnel_last_seen_at.isoformat()
+        if device.tunnel_last_seen_at
+        else None,
+    }
 
 
 @router.get("/subscription")
@@ -289,8 +369,14 @@ def subscription_status(
     eff = effective_subscription_until(device)
     delta = eff - now
     days_left = max(0, delta.days)
+    seen = device.tunnel_last_seen_at
+    tunnel_likely_active = bool(
+        seen is not None and (now - seen) <= TUNNEL_ACTIVE_GRACE
+    )
     return {
         "subscription_until": eff.isoformat(),
         "days_left": days_left,
         "has_access": eff >= now,
+        "tunnel_last_seen_at": seen.isoformat() if seen else None,
+        "tunnel_likely_active": tunnel_likely_active,
     }

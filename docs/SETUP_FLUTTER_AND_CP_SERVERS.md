@@ -23,13 +23,17 @@
   telegram_id — числовой id пользователя Telegram (не username).
 
 - GET /subscription?device_id=<uuid>
-  Ответ: { "subscription_until", "days_left", "has_access" }
+  Ответ: { "subscription_until", "days_left", "has_access", "tunnel_last_seen_at", "tunnel_likely_active" }
+
+- POST /vpn-heartbeat (опционально)
+  Body: { "device_id": "<uuid>", "connected": true | false }
+  Для метки «примерно онлайн» в подписке; на выбор серверов в /config не влияет.
 
 - GET /config?device_id=<uuid>
-  Успех 200: JSON конфигурации для VPN (outbounds, meta).
+  Успех 200: JSON конфигурации для VPN (outbounds, meta) — формат не менять.
   403: подписка истекла — показать экран оплаты / открыть бота.
   404: устройство не найдено.
-  503: нет доступных серверов на бэке.
+  503: JSON { "error": "no available servers" } — нет свободных bridge/NL по лимитам.
 
 Требования:
 1) При первом запуске сгенерировать UUID v4, сохранить в flutter_secure_storage как device_id.
@@ -75,7 +79,7 @@ pip install -r requirements.txt
 alembic upgrade head
 ```
 
-Проверка: в PostgreSQL должны существовать таблицы `cp_users`, `devices`, `cp_servers` (после ревизий `005`, `006`).
+Проверка: в PostgreSQL должны существовать таблицы `cp_users`, `devices`, `cp_servers` (цепочка миграций до `head`, включая поля для heartbeat на `devices`, если прогонял свежий код).
 
 Если Alembic ругается на ревизию — смотри `alembic_version` в БД и цепочку в `alembic/versions/`.
 
@@ -110,7 +114,7 @@ curl -s https://ТВОЙ_ДОМЕН/
 | `short_id` | shortId |
 | `sni` | serverName / SNI |
 | `path` | обычно `/` или как в конфиге |
-| `max_users` | лимит одновременных «выдач» `/config` в окне между сбросами (см. воркер) |
+| `max_users` | верхняя граница для `current_users` при балансировке (см. часть F) |
 
 ### Способ 1 — скрипт (на сервере с кодом бота и тем же `.env`)
 
@@ -124,7 +128,7 @@ python scripts/add_cp_server.py --ip 203.0.113.10 --role nl --public-key "ВАШ
 python scripts/add_cp_server.py --ip 198.51.100.20 --role standard_bridge --public-key "ВАШ_pbk" --short-id "ВАШ_sid" --sni www.other.com --path / --max-users 150
 ```
 
-Повтори для каждого физического узла (можно несколько `nl` и несколько `standard_bridge` — выбор по `current_users` и `latency`).
+Повтори для каждого физического узла (можно несколько `nl` и несколько `standard_bridge` — см. балансировку в части F).
 
 ### Способ 2 — SQL в PostgreSQL (если нет Python под рукой)
 
@@ -140,6 +144,30 @@ VALUES
 ### Health-воркер
 
 Раз в 2 минуты бэк делает TCP `ip:443`. Если узел недоступен **3 раза подряд**, выставит `active = false` — такой узел **не попадёт** в `/config`. Убедись, что файрвол **разрешает** исходящие с API к этим IP:443 (если воркер крутится на том же хосте — обычно ок).
+
+---
+
+## Часть F — балансировка `cp_servers` (реализовано в FastAPI)
+
+Схема **без** Xray stats и **без** изменения формата ответа `GET /config`. Узлы — строки в таблице **`cp_servers`** (поля `active`, `current_users`, `max_users`, `latency`).
+
+1. **Выбор кандидатов (отдельно для bridge и для NL)**  
+   - `active = true`, `max_users > 0`  
+   - `current_users < max_users`  
+   - **safety margin:** сырой load `(current_users * 1.0 / max_users) < 0.8` — запас, если счётчик неточный  
+   - сортировка: по тому же отношению `current_users / max_users` по возрастанию, затем `latency ASC NULLS LAST`  
+   - в коде: `LIMIT 3`, затем **случайный** один из этих трёх (anti-spike).  
+   - `max_users` — технический потолок; ориентир по реальной нагрузке ~70–80% от него.
+
+2. **После выбора** для каждого из двух узлов (bridge + NL): `current_users += 1` в той же транзакции, что и ответ `/config`.
+
+3. **Decay-воркер** (`workers/cp_server_decay.py`): каждые **2 минуты** для всех `active = true`: уменьшить `current_users` на **5**, не ниже **0** (плавное «остывание» вместо полного сброса).
+
+4. **503** если не нашлось bridge или NL: тело **`{"error": "no available servers"}`**.
+
+5. **Логи** (временно): `server_id`, `current_users`, `max_users`, `load_percent`.
+
+Константы в коде: `api/cp_api.py` (`_CP_LOAD_CAP` = 0.8, `_CP_TOP_K` = 3). Расписание decay: `api/main.py` (job `cp_server_decay`, интервал 2 минуты).
 
 ---
 
@@ -179,4 +207,4 @@ curl -s "$BASE/subscription?device_id=$DID"
 curl -s "$BASE/config?device_id=$DID"
 ```
 
-Если `/config` отдаёт 503 — нет подходящих строк в `cp_servers` или все `active=false` / переполнены по `max_users`.
+Если `/config` отдаёт **503** с `{"error":"no available servers"}` — нет подходящих bridge/NL в `cp_servers`, все `active=false`, упёрлись в `max_users` и/или порог **0.8** сырой загрузки.

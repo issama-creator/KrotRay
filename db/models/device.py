@@ -20,5 +20,16 @@ class Device(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    # Пинг из Flutter, пока пользователь считает VPN включённым (не число TCP-сессий на ноде).
+    tunnel_last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Последние узлы из успешного GET /config?device_id=… (для подсчёта «активных» по heartbeat).
+    last_bridge_server_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cp_servers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    last_nl_server_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cp_servers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     user = relationship("CpUser", back_populates="devices")
