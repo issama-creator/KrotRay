@@ -234,12 +234,8 @@ def get_config(
     # Быстрый тестовый режим: /config без параметров возвращает конфиг без проверки подписки.
     if not device_id:
         _ensure_test_servers_if_empty(db)
-        nl = db.scalar(
-            select(CpServer)
-            .where(CpServer.role == ROLE_NL)
-            .where(CpServer.active.is_(True))
-            .order_by(CpServer.id.asc())
-        )
+        # Как в боевом /config: наименьший current_users, затем latency
+        nl = _pick_server(db, ROLE_NL)
         if not nl:
             raise HTTPException(status_code=503, detail="no nl server")
         return _build_test_config(nl)
