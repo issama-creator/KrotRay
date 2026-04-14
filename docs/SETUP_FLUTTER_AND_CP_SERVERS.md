@@ -184,6 +184,8 @@ VALUES
 
 Заполни `edge_servers`: `type` = `exit` \| `bridge`, одинаковый **`group_id`** у пары bridge+exit. Логика в `api/edge_lb_api.py` (сырой SQL через `db.execute(text(...))`).
 
+**Нагрузочная симуляция (локально):** `scripts/simulate_edge_lb_load.py` — виртуальные `device_id`, `POST /config`, `POST /ping`; сводка по `server_id`. Сид **в консоль**: `--emit-seed-sql 100`. Сид **в БД с выводом SQL в консоль**: `DATABASE_URL=... python scripts/simulate_edge_lb_load.py --apply-seed 100`. Пайп: `--emit-seed-sql 100 | psql "$DATABASE_URL"`. Прогон: `--fast` для коротких пауз между пингами.
+
 ---
 
 ## Часть D — домен, HTTPS, Flutter
