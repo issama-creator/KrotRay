@@ -171,6 +171,21 @@ VALUES
 
 ---
 
+## Часть G — упрощённое ядро heartbeat + выбор пар (edge)
+
+**Отдельно** от legacy `servers` и CP-таблицы `devices`: таблицы **`edge_servers`**, **`edge_devices`** (миграция `010`).
+
+| Метод | Путь | Назначение |
+|--------|------|------------|
+| POST | `/ping` | `{ "device_id", "server_id" }` — upsert heartbeat; `server_id` только **exit** |
+| POST | `/config` | JSON `{ "servers": [ { "exit": {id, host}, "bridge": {id, host} }, ... ] }` до 4 пар (нагрузка считается только по **exit**) |
+
+`GET /config` (VPN из `cp_servers`) **не трогается** — другой метод на том же пути.
+
+Заполни `edge_servers`: `type` = `exit` \| `bridge`, одинаковый **`group_id`** у пары bridge+exit. Логика в `api/edge_lb_api.py` (сырой SQL через `db.execute(text(...))`).
+
+---
+
 ## Часть D — домен, HTTPS, Flutter
 
 1. **Один публичный HTTPS URL** для API (reverse proxy nginx/caddy → uvicorn `127.0.0.1:8000`).

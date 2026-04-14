@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.cp_api import router as cp_router
+from api.edge_lb_api import router as edge_lb_router
 from api.expired_job import run_expired_subscriptions
 from api.payments import router as payments_router
 from api.routes import router
@@ -43,3 +44,4 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(payments_router, prefix="/api/payments")
 app.include_router(cp_router)
+app.include_router(edge_lb_router)
