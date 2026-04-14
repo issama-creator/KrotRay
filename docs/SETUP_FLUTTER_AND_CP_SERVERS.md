@@ -178,7 +178,7 @@ VALUES
 | Метод | Путь | Назначение |
 |--------|------|------------|
 | POST | `/ping` | `{ "device_id", "server_id" }` — upsert heartbeat; `server_id` только **exit** |
-| POST | `/config` | JSON `{ "servers": [ { "exit": {id, host}, "bridge": {id, host} }, ... ] }` до **4** пар; exit с онлайн-нагрузкой **> 150** не предлагаются; из остальных — **топ 10** наименее загруженных → **random** до 4 → пары с bridge |
+| POST | `/config` | JSON `{ "servers": [ { "exit": {id, host}, "bridge": {id, host} }, ... ] }` до **4** пар; exit с онлайн-нагрузкой **≥ 150** не предлагаются (**выдаём только load < 150**); из остальных — **топ 10** наименее загруженных → **random** до 4 → пары с bridge |
 
 `GET /config` (VPN из `cp_servers`) **не трогается** — другой метод на том же пути.
 

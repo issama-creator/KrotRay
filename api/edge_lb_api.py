@@ -23,8 +23,8 @@ router = APIRouter(tags=["edge-lb"])
 
 # Окно «онлайн» для учёта нагрузки на exit (только свежие last_seen)
 ONLINE_SEC = 90
-# Exit с нагрузкой > этого числа новым клиентам не отдаём (перегруз).
-MAX_EXIT_LOAD_FOR_ASSIGNMENT = 150
+# Выдаём только exit с онлайн-нагрузкой СТРОГО меньше этого числа (149 и меньше — ок, 150+ — нет).
+MAX_EXIT_ONLINE_EXCLUSIVE = 150
 # Среди «доступных» exit: топ наименее загруженных, затем random → финальные пары.
 TOP_LEAST_LOADED = 10
 RETURN_PAIRS = 4
@@ -75,18 +75,18 @@ def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
 def _fetch_exits_least_loaded(
     db: Session,
     *,
-    max_load: int | None,
+    max_online_exclusive: int | None,
     limit: int,
 ) -> list[Any]:
     """
     Активные exit с подсчётом load (онлайн-устройства за ONLINE_SEC).
-    Если max_load задан — только exit с load <= max_load (сверх порога «не выдаём»).
+    Если max_online_exclusive задан — только exit с load < порога (например < 150).
     """
     load_filter = ""
     params: dict[str, Any] = {"online_sec": ONLINE_SEC, "top_n": limit}
-    if max_load is not None:
-        load_filter = "AND COALESCE(cnt.c, 0) <= :max_load"
-        params["max_load"] = max_load
+    if max_online_exclusive is not None:
+        load_filter = "AND COALESCE(cnt.c, 0) < :max_excl"
+        params["max_excl"] = max_online_exclusive
 
     sql = f"""
             SELECT
@@ -115,7 +115,7 @@ def _fetch_exits_least_loaded(
 def post_edge_config(db: Session = Depends(get_db)) -> dict[str, Any]:
     """
     1) Нагрузка только по exit (COUNT edge_devices с last_seen за ONLINE_SEC).
-    2) Не отдаём exit с load > MAX_EXIT_LOAD_FOR_ASSIGNMENT (перегруженные).
+    2) Отдаём только exit с load < MAX_EXIT_ONLINE_EXCLUSIVE (например 150 → допустимо 0..149).
     3) Из оставшихся — топ TOP_LEAST_LOADED наименее загруженных.
     4) random.sample до RETURN_PAIRS — размазать наплыв.
     5) К каждому exit — активный bridge с тем же group_id.
@@ -123,12 +123,12 @@ def post_edge_config(db: Session = Depends(get_db)) -> dict[str, Any]:
     """
     rows = _fetch_exits_least_loaded(
         db,
-        max_load=MAX_EXIT_LOAD_FOR_ASSIGNMENT,
+        max_online_exclusive=MAX_EXIT_ONLINE_EXCLUSIVE,
         limit=TOP_LEAST_LOADED,
     )
     if not rows:
-        # Все перегружены выше порога — всё равно отдаём наименее жирные TOP_LEAST_LOADED
-        rows = _fetch_exits_least_loaded(db, max_load=None, limit=TOP_LEAST_LOADED)
+        # Все с load >= порога — fallback без фильтра (чтобы не отдать пустой ответ)
+        rows = _fetch_exits_least_loaded(db, max_online_exclusive=None, limit=TOP_LEAST_LOADED)
 
     if not rows:
         return {"servers": []}
