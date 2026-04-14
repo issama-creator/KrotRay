@@ -23,9 +23,11 @@ router = APIRouter(tags=["edge-lb"])
 
 # Окно «онлайн» для учёта нагрузки на exit (только свежие last_seen)
 ONLINE_SEC = 90
-# Сколько exit берём в короткий список по нагрузке, из них случайно выбираем пары
-TOP_EXITS = 8
-PICK_EXITS = 4
+# Exit с нагрузкой > этого числа новым клиентам не отдаём (перегруз).
+MAX_EXIT_LOAD_FOR_ASSIGNMENT = 150
+# Среди «доступных» exit: топ наименее загруженных, затем random → финальные пары.
+TOP_LEAST_LOADED = 10
+RETURN_PAIRS = 4
 
 
 class PingBody(BaseModel):
@@ -70,19 +72,23 @@ def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
     return {"ok": True}
 
 
-@router.post("/config")
-def post_edge_config(db: Session = Depends(get_db)) -> dict[str, Any]:
+def _fetch_exits_least_loaded(
+    db: Session,
+    *,
+    max_load: int | None,
+    limit: int,
+) -> list[Any]:
     """
-    1) Все активные exit.
-    2) Нагрузка = число edge_devices с last_seen в последних ONLINE_SEC секунд (только по exit server_id).
-    3) Сортировка по нагрузке ASC, топ TOP_EXITS.
-    4) Случайно PICK_EXITS exit.
-    5) Для каждого — bridge с тем же group_id (is_active).
+    Активные exit с подсчётом load (онлайн-устройства за ONLINE_SEC).
+    Если max_load задан — только exit с load <= max_load (сверх порога «не выдаём»).
     """
-    # Нагрузка только по exit: считаем устройства, привязанные к этому exit id
-    rows = db.execute(
-        text(
-            """
+    load_filter = ""
+    params: dict[str, Any] = {"online_sec": ONLINE_SEC, "top_n": limit}
+    if max_load is not None:
+        load_filter = "AND COALESCE(cnt.c, 0) <= :max_load"
+        params["max_load"] = max_load
+
+    sql = f"""
             SELECT
                 s.id,
                 s.name,
@@ -98,18 +104,37 @@ def post_edge_config(db: Session = Depends(get_db)) -> dict[str, Any]:
                 GROUP BY d.server_id
             ) cnt ON cnt.server_id = s.id
             WHERE s.type = 'exit' AND s.is_active = true
+            {load_filter}
             ORDER BY load ASC, s.id ASC
             LIMIT :top_n
             """
-        ),
-        {"online_sec": ONLINE_SEC, "top_n": TOP_EXITS},
-    ).mappings().all()
+    return list(db.execute(text(sql), params).mappings().all())
+
+
+@router.post("/config")
+def post_edge_config(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """
+    1) Нагрузка только по exit (COUNT edge_devices с last_seen за ONLINE_SEC).
+    2) Не отдаём exit с load > MAX_EXIT_LOAD_FOR_ASSIGNMENT (перегруженные).
+    3) Из оставшихся — топ TOP_LEAST_LOADED наименее загруженных.
+    4) random.sample до RETURN_PAIRS — размазать наплыв.
+    5) К каждому exit — активный bridge с тем же group_id.
+    Если все exit > порога — fallback: топ TOP_LEAST_LOADED без фильтра по load (сервис не пустой).
+    """
+    rows = _fetch_exits_least_loaded(
+        db,
+        max_load=MAX_EXIT_LOAD_FOR_ASSIGNMENT,
+        limit=TOP_LEAST_LOADED,
+    )
+    if not rows:
+        # Все перегружены выше порога — всё равно отдаём наименее жирные TOP_LEAST_LOADED
+        rows = _fetch_exits_least_loaded(db, max_load=None, limit=TOP_LEAST_LOADED)
 
     if not rows:
         return {"servers": []}
 
-    # Случайность среди наименее загруженных (anti-spike)
-    k = min(PICK_EXITS, len(rows))
+    # Случайные RETURN_PAIRS из топ-10 наименее загруженных (anti-spike)
+    k = min(RETURN_PAIRS, len(rows))
     chosen = random.sample(list(rows), k=k)
 
     servers_out: list[dict[str, Any]] = []
