@@ -45,15 +45,32 @@ async def main() -> None:
     config = uvicorn.Config("api.main:app", host=host, port=port)
     server = uvicorn.Server(config)
     api_task = asyncio.create_task(server.serve())
+    # Дать uvicorn занять порт до запросов к Telegram (иначе при падении бота сразу 502)
+    await asyncio.sleep(0.3)
 
     try:
         await dp.start_polling(bot)
-    finally:
-        api_task.cancel()
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        # Таймаут/блок api.telegram.org и т.п. — не гасим HTTP API (иначе nginx → 502)
+        logging.exception(
+            "Telegram недоступен (%s). Uvicorn продолжает на %s:%s без polling бота.",
+            e,
+            host,
+            port,
+        )
         try:
             await api_task
         except asyncio.CancelledError:
-            pass
+            raise
+    finally:
+        if not api_task.done():
+            api_task.cancel()
+            try:
+                await api_task
+            except asyncio.CancelledError:
+                pass
 
 
 if __name__ == "__main__":
