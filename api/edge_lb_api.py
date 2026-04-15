@@ -64,18 +64,34 @@ def _fetch_valid_edge_user(db: Session, *, key: str, device_id: str) -> Any | No
     ).mappings().first()
 
 
-def _resolve_or_create_key(db: Session, body: ConfigBody) -> tuple[str, dict[str, Any] | None]:
+def _resolve_or_create_key(db: Session, body: ConfigBody) -> tuple[str, str | None]:
     did = _normalize_device_id(body.device_id)
     if body.key:
         row = _fetch_valid_edge_user(db, key=body.key.strip(), device_id=did)
         if not row:
-            return "", {"error": "subscription_required"}
+            return "", "subscription_required"
         return str(row["key"]), None
 
-    existing = db.execute(
+    # Race-safe create: если два запроса прилетели одновременно на один device_id,
+    # второй не падает на UNIQUE, а просто читает уже созданную строку.
+    new_key = str(uuid.uuid4())
+    db.execute(
         text(
             """
-            SELECT key, expires_at, is_active FROM edge_users
+            INSERT INTO edge_users (key, device_id, expires_at, is_active, created_at)
+            VALUES (:key, :device_id, NOW() + (:trial_days * INTERVAL '1 day'), true, NOW())
+            ON CONFLICT (device_id) DO NOTHING
+            """
+        ),
+        {"key": new_key, "device_id": did, "trial_days": TRIAL_DAYS},
+    )
+    db.commit()
+
+    current = db.execute(
+        text(
+            """
+            SELECT key, expires_at, is_active
+            FROM edge_users
             WHERE device_id = :device_id
             ORDER BY id DESC
             LIMIT 1
@@ -83,24 +99,14 @@ def _resolve_or_create_key(db: Session, body: ConfigBody) -> tuple[str, dict[str
         ),
         {"device_id": did},
     ).mappings().first()
-    if existing:
-        valid = _fetch_valid_edge_user(db, key=str(existing["key"]), device_id=did)
-        if not valid:
-            return "", {"error": "subscription_required"}
-        return str(valid["key"]), None
+    if not current:
+        logger.error("edge_config: edge_users row missing after upsert for device_id=%s", did)
+        return "", "internal_error"
 
-    new_key = str(uuid.uuid4())
-    db.execute(
-        text(
-            """
-            INSERT INTO edge_users (key, device_id, expires_at, is_active, created_at)
-            VALUES (:key, :device_id, NOW() + (:trial_days * INTERVAL '1 day'), true, NOW())
-            """
-        ),
-        {"key": new_key, "device_id": did, "trial_days": TRIAL_DAYS},
-    )
-    db.commit()
-    return new_key, None
+    valid = _fetch_valid_edge_user(db, key=str(current["key"]), device_id=did)
+    if not valid:
+        return "", "subscription_required"
+    return str(valid["key"]), None
 
 
 @router.post("/ping")
@@ -169,8 +175,10 @@ def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[st
     Авторизация по key/device_id, затем выдача 4 случайных серверов из топ-10 least-loaded.
     """
     resolved_key, auth_error = _resolve_or_create_key(db, body)
-    if auth_error:
-        return auth_error
+    if auth_error == "subscription_required":
+        raise HTTPException(status_code=403, detail="subscription_required")
+    if auth_error == "internal_error":
+        raise HTTPException(status_code=500, detail="internal_error")
 
     rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED)
     if not rows:

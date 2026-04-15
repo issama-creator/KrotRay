@@ -95,6 +95,13 @@ def simulate_one_user(
         time.sleep(random.uniform(*DELAY_AFTER_CONFIG))
         r = session.post(f"{base}/config", json={"key": None, "device_id": did}, timeout=60)
         if r.status_code != 200:
+            if r.status_code == 403:
+                try:
+                    payload = r.json()
+                    if payload.get("detail") == "subscription_required":
+                        return None, "config_subscription_required"
+                except Exception:
+                    pass
             return None, f"config_http_{r.status_code}"
         data = r.json()
         key = (data.get("key") or "").strip()
