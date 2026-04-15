@@ -14,6 +14,7 @@ from db.models import (  # noqa: F401
     CpServer,
     CpUser,
     Device,
+    EdgeUser,
     Payment,
     Server,
     Subscription,

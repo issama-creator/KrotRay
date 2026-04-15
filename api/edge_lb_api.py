@@ -1,13 +1,14 @@
 """
-Ядро: heartbeat по exit, нагрузка только по exit, выдача 4 пар bridge+exit.
+Edge LB: выдача 4 менее нагруженных exit + heartbeat по device_id.
 
-Таблицы: edge_servers, edge_devices (не legacy servers / не CP devices).
-Эндпоинты: POST /ping, POST /config (рядом с GET /config из cp_api — другой HTTP-метод).
+Таблицы: edge_users, edge_servers, edge_devices.
+Эндпоинты: POST /config, POST /ping.
 """
 from __future__ import annotations
 
 import logging
 import random
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,26 +22,95 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["edge-lb"])
 
-# Окно «онлайн» для учёта нагрузки на exit (только свежие last_seen)
+# Окно «онлайн» для учёта нагрузки на exit.
 ONLINE_SEC = 90
-# Выдаём только exit с онлайн-нагрузкой СТРОГО меньше этого числа (149 и меньше — ок, 150+ — нет).
-MAX_EXIT_ONLINE_EXCLUSIVE = 150
-# Среди «доступных» exit: топ наименее загруженных, затем random → финальные пары.
+# Из топа наименее загруженных выбираем случайные.
 TOP_LEAST_LOADED = 10
 RETURN_PAIRS = 4
+TRIAL_DAYS = 3
+
+
+class ConfigBody(BaseModel):
+    device_id: str = Field(..., min_length=1)
+    key: str | None = None
 
 
 class PingBody(BaseModel):
     device_id: str = Field(..., min_length=1)
+    key: str = Field(..., min_length=1)
     server_id: int = Field(..., description="id exit-сервера (type=exit)")
+
+
+def _normalize_device_id(raw: str) -> str:
+    did = raw.strip()
+    if not did:
+        raise HTTPException(status_code=400, detail="device_id is required")
+    return did
+
+
+def _fetch_valid_edge_user(db: Session, *, key: str, device_id: str) -> Any | None:
+    return db.execute(
+        text(
+            """
+            SELECT id, key, device_id, expires_at, is_active
+            FROM edge_users
+            WHERE key = :key
+              AND device_id = :device_id
+              AND is_active = true
+              AND expires_at > NOW()
+            """
+        ),
+        {"key": key, "device_id": device_id},
+    ).mappings().first()
+
+
+def _resolve_or_create_key(db: Session, body: ConfigBody) -> tuple[str, dict[str, Any] | None]:
+    did = _normalize_device_id(body.device_id)
+    if body.key:
+        row = _fetch_valid_edge_user(db, key=body.key.strip(), device_id=did)
+        if not row:
+            return "", {"error": "subscription_required"}
+        return str(row["key"]), None
+
+    existing = db.execute(
+        text(
+            """
+            SELECT key, expires_at, is_active FROM edge_users
+            WHERE device_id = :device_id
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ),
+        {"device_id": did},
+    ).mappings().first()
+    if existing:
+        valid = _fetch_valid_edge_user(db, key=str(existing["key"]), device_id=did)
+        if not valid:
+            return "", {"error": "subscription_required"}
+        return str(valid["key"]), None
+
+    new_key = str(uuid.uuid4())
+    db.execute(
+        text(
+            """
+            INSERT INTO edge_users (key, device_id, expires_at, is_active, created_at)
+            VALUES (:key, :device_id, NOW() + (:trial_days * INTERVAL '1 day'), true, NOW())
+            """
+        ),
+        {"key": new_key, "device_id": did, "trial_days": TRIAL_DAYS},
+    )
+    db.commit()
+    return new_key, None
 
 
 @router.post("/ping")
 def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
-    """
-    Heartbeat: одна строка на device_id (upsert).
-    server_id — только exit; нагрузка считается по привязке устройства к exit.
-    """
+    did = _normalize_device_id(body.device_id)
+    key = body.key.strip()
+    user = _fetch_valid_edge_user(db, key=key, device_id=did)
+    if not user:
+        raise HTTPException(status_code=403, detail="subscription_required")
+
     row = db.execute(
         text(
             """
@@ -66,35 +136,18 @@ def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
                 last_seen = NOW()
             """
         ),
-        {"device_id": body.device_id.strip(), "server_id": body.server_id},
+        {"device_id": did, "server_id": body.server_id},
     )
     db.commit()
     return {"ok": True}
 
 
-def _fetch_exits_least_loaded(
-    db: Session,
-    *,
-    max_online_exclusive: int | None,
-    limit: int,
-) -> list[Any]:
-    """
-    Активные exit с подсчётом load (онлайн-устройства за ONLINE_SEC).
-    Если max_online_exclusive задан — только exit с load < порога (например < 150).
-    """
-    load_filter = ""
-    params: dict[str, Any] = {"online_sec": ONLINE_SEC, "top_n": limit}
-    if max_online_exclusive is not None:
-        load_filter = "AND COALESCE(cnt.c, 0) < :max_excl"
-        params["max_excl"] = max_online_exclusive
-
-    sql = f"""
+def _fetch_exits_least_loaded(db: Session, *, limit: int) -> list[Any]:
+    sql = """
             SELECT
                 s.id,
                 s.name,
-                s.group_id,
                 s.host,
-                s.real_ip,
                 COALESCE(cnt.c, 0)::int AS load
             FROM edge_servers s
             LEFT JOIN (
@@ -104,82 +157,36 @@ def _fetch_exits_least_loaded(
                 GROUP BY d.server_id
             ) cnt ON cnt.server_id = s.id
             WHERE s.type = 'exit' AND s.is_active = true
-            {load_filter}
             ORDER BY load ASC, s.id ASC
             LIMIT :top_n
             """
-    return list(db.execute(text(sql), params).mappings().all())
+    return list(db.execute(text(sql), {"online_sec": ONLINE_SEC, "top_n": limit}).mappings().all())
 
 
 @router.post("/config")
-def post_edge_config(db: Session = Depends(get_db)) -> dict[str, Any]:
+def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     """
-    1) Нагрузка только по exit (COUNT edge_devices с last_seen за ONLINE_SEC).
-    2) Отдаём только exit с load < MAX_EXIT_ONLINE_EXCLUSIVE (например 150 → допустимо 0..149).
-    3) Из оставшихся — топ TOP_LEAST_LOADED наименее загруженных.
-    4) random.sample до RETURN_PAIRS — размазать наплыв.
-    5) К каждому exit — активный bridge с тем же group_id.
-    Если все exit > порога — fallback: топ TOP_LEAST_LOADED без фильтра по load (сервис не пустой).
+    Авторизация по key/device_id, затем выдача 4 случайных серверов из топ-10 least-loaded.
     """
-    rows = _fetch_exits_least_loaded(
-        db,
-        max_online_exclusive=MAX_EXIT_ONLINE_EXCLUSIVE,
-        limit=TOP_LEAST_LOADED,
-    )
-    if not rows:
-        # Все с load >= порога — fallback без фильтра (чтобы не отдать пустой ответ)
-        rows = _fetch_exits_least_loaded(db, max_online_exclusive=None, limit=TOP_LEAST_LOADED)
+    resolved_key, auth_error = _resolve_or_create_key(db, body)
+    if auth_error:
+        return auth_error
 
+    rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED)
     if not rows:
-        return {"servers": []}
+        return {"key": resolved_key, "servers": []}
 
-    # Случайные RETURN_PAIRS из топ-10 наименее загруженных (anti-spike)
     k = min(RETURN_PAIRS, len(rows))
     chosen = random.sample(list(rows), k=k)
 
     servers_out: list[dict[str, Any]] = []
     for ex in chosen:
-        gid = ex["group_id"]
-        if gid is None:
-            logger.warning("edge_config: exit id=%s has no group_id, skip", ex["id"])
-            continue
-
-        br = db.execute(
-            text(
-                """
-                SELECT id, host
-                FROM edge_servers
-                WHERE type = 'bridge' AND is_active = true AND group_id = :gid
-                ORDER BY id ASC
-                LIMIT 1
-                """
-            ),
-            {"gid": gid},
-        ).mappings().first()
-
-        if br is None:
-            logger.warning("edge_config: no active bridge for group_id=%s (exit id=%s)", gid, ex["id"])
-            continue
-
         servers_out.append(
             {
-                "exit": {
-                    "id": ex["id"],
-                    "host": ex["host"],
-                },
-                "bridge": {
-                    "id": br["id"],
-                    "host": br["host"],
-                },
+                "id": ex["id"],
+                "host": ex["host"],
+                "port": 443,
             }
         )
-
-        logger.info(
-            "edge_config pick: exit_id=%s load=%s bridge_id=%s group_id=%s",
-            ex["id"],
-            ex["load"],
-            br["id"],
-            gid,
-        )
-
-    return {"servers": servers_out}
+    logger.info("edge_config: device_id=%s returned=%s", body.device_id, len(servers_out))
+    return {"key": resolved_key, "servers": servers_out}

@@ -93,26 +93,30 @@ def simulate_one_user(
     base = base_url.rstrip("/")
     try:
         time.sleep(random.uniform(*DELAY_AFTER_CONFIG))
-        r = session.post(f"{base}/config", json={}, timeout=60)
+        r = session.post(f"{base}/config", json={"key": None, "device_id": did}, timeout=60)
         if r.status_code != 200:
             return None, f"config_http_{r.status_code}"
         data = r.json()
+        key = (data.get("key") or "").strip()
+        if not key:
+            if data.get("error") == "subscription_required":
+                return None, "config_subscription_required"
+            return None, "config_missing_key"
         servers: list = data.get("servers") or []
         if not servers:
             return None, "config_empty_servers"
 
-        # Как будто пользователь выбирает одну из выданных пар (случайно — меньше склейки на первый exit)
-        pair = random.choice(servers)
-        exit_block = pair.get("exit") or {}
-        eid = exit_block.get("id")
+        # Как будто пользователь выбирает один из выданных серверов случайно.
+        server = random.choice(servers)
+        eid = server.get("id")
         if eid is None:
-            return None, "config_no_exit_id"
+            return None, "config_no_server_id"
 
         time.sleep(random.uniform(*DELAY_AFTER_PING))
         for round_i in range(ping_rounds):
             pr = session.post(
                 f"{base}/ping",
-                json={"device_id": did, "server_id": int(eid)},
+                json={"device_id": did, "server_id": int(eid), "key": key},
                 timeout=30,
             )
             if pr.status_code != 200:
