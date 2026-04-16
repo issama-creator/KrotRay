@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["edge-lb"])
 
-# Окно «онлайн» для учёта нагрузки на exit.
-ONLINE_SEC = 90
+# Временно расширили окно «онлайн» для тестов, чтобы нагрузка не обнулялась каждые 90 сек.
+ONLINE_SEC = 86400
 # Из топа наименее загруженных выбираем случайные.
 TOP_LEAST_LOADED = 10
 RETURN_PAIRS = 4
