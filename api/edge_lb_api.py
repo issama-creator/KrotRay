@@ -7,6 +7,7 @@ Edge LB: выдача 4 менее нагруженных exit + heartbeat по 
 from __future__ import annotations
 
 import logging
+import os
 import random
 import uuid
 from typing import Any
@@ -27,6 +28,13 @@ ONLINE_SEC = 86400
 # Из топа наименее загруженных выбираем случайные.
 TOP_LEAST_LOADED = 10
 RETURN_PAIRS = 4
+# Подготовка к split-пулам: 2 обычных + 2 обходных.
+RETURN_DIRECT = 2
+RETURN_BYPASS = 2
+# Имена пулов можно переопределить через env для гибкой раскладки серверов.
+EDGE_POOL_DIRECT = os.getenv("EDGE_POOL_DIRECT", "nl")
+EDGE_POOL_BYPASS = os.getenv("EDGE_POOL_BYPASS", "bypass")
+EDGE_POOL_SHARED = os.getenv("EDGE_POOL_SHARED", "shared")
 TRIAL_DAYS = 3
 
 
@@ -148,12 +156,14 @@ def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
     return {"ok": True}
 
 
-def _fetch_exits_least_loaded(db: Session, *, limit: int) -> list[Any]:
+def _fetch_exits_least_loaded(db: Session, *, limit: int, pool: str | None = None) -> list[Any]:
     sql = """
             SELECT
                 s.id,
                 s.name,
                 s.host,
+                s.group_id,
+                COALESCE(s.pool, :shared_pool) AS pool,
                 COALESCE(cnt.c, 0)::int AS load
             FROM edge_servers s
             LEFT JOIN (
@@ -163,10 +173,50 @@ def _fetch_exits_least_loaded(db: Session, *, limit: int) -> list[Any]:
                 GROUP BY d.server_id
             ) cnt ON cnt.server_id = s.id
             WHERE s.type = 'exit' AND s.is_active = true
+              AND (:pool IS NULL OR COALESCE(s.pool, :shared_pool) = :pool)
             ORDER BY load ASC, s.id ASC
             LIMIT :top_n
             """
-    return list(db.execute(text(sql), {"online_sec": ONLINE_SEC, "top_n": limit}).mappings().all())
+    return list(
+        db.execute(
+            text(sql),
+            {"online_sec": ONLINE_SEC, "top_n": limit, "pool": pool, "shared_pool": EDGE_POOL_SHARED},
+        )
+        .mappings()
+        .all()
+    )
+
+
+def _fetch_bridges_by_group(db: Session, *, group_ids: list[str], pool: str | None = None) -> dict[str, Any]:
+    if not group_ids:
+        return {}
+    sql = """
+        SELECT
+            b.id,
+            b.group_id,
+            b.host,
+            COALESCE(b.pool, :shared_pool) AS pool
+        FROM edge_servers b
+        WHERE b.type = 'bridge'
+          AND b.is_active = true
+          AND b.group_id = ANY(:group_ids)
+          AND (:pool IS NULL OR COALESCE(b.pool, :shared_pool) = :pool)
+        ORDER BY b.id ASC
+    """
+    rows = list(
+        db.execute(
+            text(sql),
+            {"group_ids": group_ids, "pool": pool, "shared_pool": EDGE_POOL_SHARED},
+        )
+        .mappings()
+        .all()
+    )
+    by_group: dict[str, Any] = {}
+    for row in rows:
+        gid = str(row["group_id"] or "")
+        if gid and gid not in by_group:
+            by_group[gid] = row
+    return by_group
 
 
 def _pick_best_tier_random(rows: list[Any], *, k: int) -> list[Any]:
@@ -197,11 +247,33 @@ def _pick_best_tier_random(rows: list[Any], *, k: int) -> list[Any]:
     return random.sample(candidates, k=kk)
 
 
+def _append_direct_unique(out: list[dict[str, Any]], rows: list[Any], *, cap: int) -> None:
+    used_ids = {int(item["id"]) for item in out if "id" in item}
+    for ex in rows:
+        sid = int(ex["id"])
+        if sid in used_ids:
+            continue
+        out.append(
+            {
+                "id": sid,
+                "host": ex["host"],
+                "port": 443,
+                "mode": "direct",
+                "pool": ex["pool"],
+            }
+        )
+        used_ids.add(sid)
+        if len(out) >= cap:
+            return
+
+
 @router.post("/config")
 def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     """
-    Авторизация по key/device_id, затем выдача 4 серверов из top-N least-loaded.
-    Более загруженные tier'ы не попадают в выдачу, пока хватает более лёгких.
+    Авторизация по key/device_id.
+    Основной режим: 2 direct + 2 bypass (раздельные пулы exit, нагрузка только по exit).
+    Для bypass по group_id добавляется связанный bridge.
+    Fallback (на старых данных): 4 сервера из общего пула.
     """
     resolved_key, auth_error = _resolve_or_create_key(db, body)
     if auth_error == "subscription_required":
@@ -209,20 +281,52 @@ def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[st
     if auth_error == "internal_error":
         raise HTTPException(status_code=500, detail="internal_error")
 
-    rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED)
-    if not rows:
-        return {"key": resolved_key, "servers": []}
+    direct_rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED, pool=EDGE_POOL_DIRECT)
+    bypass_rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED, pool=EDGE_POOL_BYPASS)
 
-    chosen = _pick_best_tier_random(rows, k=RETURN_PAIRS)
+    chosen_direct = _pick_best_tier_random(direct_rows, k=RETURN_DIRECT)
+    chosen_bypass_exits = _pick_best_tier_random(bypass_rows, k=RETURN_BYPASS)
 
     servers_out: list[dict[str, Any]] = []
-    for ex in chosen:
+    for ex in chosen_direct:
         servers_out.append(
             {
                 "id": ex["id"],
                 "host": ex["host"],
                 "port": 443,
+                "mode": "direct",
+                "pool": ex["pool"],
             }
         )
+
+    bypass_group_ids = [str(ex["group_id"]) for ex in chosen_bypass_exits if ex.get("group_id")]
+    bridges_by_group = _fetch_bridges_by_group(db, group_ids=bypass_group_ids, pool=EDGE_POOL_BYPASS)
+    for ex in chosen_bypass_exits:
+        gid = str(ex.get("group_id") or "")
+        bridge = bridges_by_group.get(gid)
+        if not bridge:
+            # Без bridge обходной маршрут неполный — пропускаем.
+            continue
+        servers_out.append(
+            {
+                "id": ex["id"],
+                "host": ex["host"],
+                "port": 443,
+                "mode": "bypass",
+                "pool": ex["pool"],
+                "bridge": {
+                    "id": bridge["id"],
+                    "host": bridge["host"],
+                    "port": 443,
+                },
+            }
+        )
+
+    # Fallback/добор: если split-пулы ещё не готовы или не хватает bypass-пар, добираем direct из общего пула.
+    if len(servers_out) < RETURN_PAIRS:
+        rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED, pool=None)
+        chosen = _pick_best_tier_random(rows, k=RETURN_PAIRS)
+        _append_direct_unique(servers_out, chosen, cap=RETURN_PAIRS)
+
     logger.info("edge_config: device_id=%s returned=%s", body.device_id, len(servers_out))
     return {"key": resolved_key, "servers": servers_out}
