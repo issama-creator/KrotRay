@@ -169,10 +169,39 @@ def _fetch_exits_least_loaded(db: Session, *, limit: int) -> list[Any]:
     return list(db.execute(text(sql), {"online_sec": ONLINE_SEC, "top_n": limit}).mappings().all())
 
 
+def _pick_best_tier_random(rows: list[Any], *, k: int) -> list[Any]:
+    """
+    Из уже отсортированных по load ASC строк выбираем случайные k,
+    но только из "лучшего" набора: включаем следующий tier нагрузки
+    только если иначе не набирается k кандидатов.
+    """
+    if not rows or k <= 0:
+        return []
+
+    # rows уже ORDER BY load ASC, id ASC
+    cutoff_load: int | None = None
+    count = 0
+    for r in rows:
+        if cutoff_load is None:
+            cutoff_load = int(r["load"])
+        if int(r["load"]) != cutoff_load and count >= k:
+            break
+        cutoff_load = int(r["load"])
+        count += 1
+
+    if cutoff_load is None:
+        return []
+
+    candidates = [r for r in rows if int(r["load"]) <= cutoff_load]
+    kk = min(k, len(candidates))
+    return random.sample(candidates, k=kk)
+
+
 @router.post("/config")
 def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     """
-    Авторизация по key/device_id, затем выдача 4 случайных серверов из топ-10 least-loaded.
+    Авторизация по key/device_id, затем выдача 4 серверов из top-N least-loaded.
+    Более загруженные tier'ы не попадают в выдачу, пока хватает более лёгких.
     """
     resolved_key, auth_error = _resolve_or_create_key(db, body)
     if auth_error == "subscription_required":
@@ -184,8 +213,7 @@ def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[st
     if not rows:
         return {"key": resolved_key, "servers": []}
 
-    k = min(RETURN_PAIRS, len(rows))
-    chosen = random.sample(list(rows), k=k)
+    chosen = _pick_best_tier_random(rows, k=RETURN_PAIRS)
 
     servers_out: list[dict[str, Any]] = []
     for ex in chosen:
