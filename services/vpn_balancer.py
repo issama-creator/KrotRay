@@ -42,7 +42,7 @@ def calculate_weight(server: dict, now: datetime) -> float:
 
 def get_active_users_map(db: Session) -> dict[int, int]:
     """
-    Returns active users grouped by server_id for last 180 seconds.
+    Returns active users grouped by server_id from live edge sessions.
 
     Output example:
         {1: 120, 2: 87}
@@ -51,8 +51,9 @@ def get_active_users_map(db: Session) -> dict[int, int]:
         text(
             """
             SELECT server_id, COUNT(*)::int AS active
-            FROM connections
-            WHERE last_seen > NOW() - INTERVAL '180 seconds'
+            FROM edge_sessions
+            WHERE stopped_at IS NULL
+              AND expires_at > NOW()
             GROUP BY server_id
             """
         )

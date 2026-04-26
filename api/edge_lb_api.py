@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api.cp_api import get_db
+from services.edge_top_cache import load_top_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,6 @@ EDGE_POOL_BYPASS = os.getenv("EDGE_POOL_BYPASS", "bypass")
 EDGE_POOL_SHARED = os.getenv("EDGE_POOL_SHARED", "shared")
 TRIAL_DAYS = 3
 EDGE_LOAD_TIE_BREAK = os.getenv("EDGE_LOAD_TIE_BREAK", "random").strip().lower()
-EDGE_LOAD_WEIGHT_POWER = float(os.getenv("EDGE_LOAD_WEIGHT_POWER", "1.4"))
 
 
 class ConfigBody(BaseModel):
@@ -51,6 +51,28 @@ class PingBody(BaseModel):
     device_id: str = Field(..., min_length=1)
     key: str = Field(..., min_length=1)
     server_id: int = Field(..., description="id exit-сервера (type=exit)")
+
+
+class SessionStartBody(BaseModel):
+    device_id: str = Field(..., min_length=1)
+    key: str = Field(..., min_length=1)
+    server_id: int = Field(..., description="id exit-сервера (type=exit)")
+    session_id: str | None = Field(default=None, min_length=1)
+
+
+class SessionStopBody(BaseModel):
+    device_id: str = Field(..., min_length=1)
+    key: str = Field(..., min_length=1)
+    session_id: str = Field(..., min_length=1)
+
+
+class SessionRenewBody(BaseModel):
+    device_id: str = Field(..., min_length=1)
+    key: str = Field(..., min_length=1)
+    session_id: str = Field(..., min_length=1)
+
+
+SESSION_TTL_SEC = int(os.getenv("EDGE_SESSION_TTL_SEC", "900"))
 
 
 def _normalize_device_id(raw: str) -> str:
@@ -171,6 +193,120 @@ def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
     )
     db.commit()
     return {"ok": True}
+
+
+@router.post("/session/start")
+def post_session_start(body: SessionStartBody, db: Session = Depends(get_db)) -> dict[str, Any]:
+    did = _normalize_device_id(body.device_id)
+    key = body.key.strip()
+    user = _fetch_valid_edge_user(db, key=key, device_id=did)
+    if not user:
+        raise HTTPException(status_code=403, detail="subscription_required")
+
+    row = db.execute(
+        text(
+            """
+            SELECT id, type FROM edge_servers
+            WHERE id = :sid AND is_active = true
+            """
+        ),
+        {"sid": body.server_id},
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=400, detail="unknown or inactive server_id")
+    if row[1] != "exit":
+        raise HTTPException(status_code=400, detail="server_id must be an exit server")
+
+    session_id = (body.session_id or "").strip() or str(uuid.uuid4())
+    db.execute(
+        text(
+            """
+            INSERT INTO edge_sessions (session_id, key, device_id, server_id, expires_at, stopped_at, updated_at)
+            VALUES (
+                :session_id,
+                :key,
+                :device_id,
+                :server_id,
+                NOW() + (:ttl_sec * INTERVAL '1 second'),
+                NULL,
+                NOW()
+            )
+            ON CONFLICT (session_id) DO UPDATE SET
+                key = EXCLUDED.key,
+                device_id = EXCLUDED.device_id,
+                server_id = EXCLUDED.server_id,
+                expires_at = NOW() + (:ttl_sec * INTERVAL '1 second'),
+                stopped_at = NULL,
+                updated_at = NOW()
+            """
+        ),
+        {
+            "session_id": session_id,
+            "key": key,
+            "device_id": did,
+            "server_id": body.server_id,
+            "ttl_sec": SESSION_TTL_SEC,
+        },
+    )
+    db.commit()
+    return {"ok": True, "session_id": session_id, "ttl_sec": SESSION_TTL_SEC}
+
+
+@router.post("/session/stop")
+def post_session_stop(body: SessionStopBody, db: Session = Depends(get_db)) -> dict[str, bool]:
+    did = _normalize_device_id(body.device_id)
+    key = body.key.strip()
+    user = _fetch_valid_edge_user(db, key=key, device_id=did)
+    if not user:
+        raise HTTPException(status_code=403, detail="subscription_required")
+
+    result = db.execute(
+        text(
+            """
+            UPDATE edge_sessions
+            SET stopped_at = NOW(), expires_at = NOW(), updated_at = NOW()
+            WHERE session_id = :session_id
+              AND key = :key
+              AND device_id = :device_id
+              AND stopped_at IS NULL
+            """
+        ),
+        {"session_id": body.session_id.strip(), "key": key, "device_id": did},
+    )
+    db.commit()
+    return {"ok": True, "closed": (result.rowcount or 0) > 0}
+
+
+@router.post("/session/renew")
+def post_session_renew(body: SessionRenewBody, db: Session = Depends(get_db)) -> dict[str, Any]:
+    did = _normalize_device_id(body.device_id)
+    key = body.key.strip()
+    user = _fetch_valid_edge_user(db, key=key, device_id=did)
+    if not user:
+        raise HTTPException(status_code=403, detail="subscription_required")
+
+    result = db.execute(
+        text(
+            """
+            UPDATE edge_sessions
+            SET
+                expires_at = NOW() + (:ttl_sec * INTERVAL '1 second'),
+                updated_at = NOW()
+            WHERE session_id = :session_id
+              AND key = :key
+              AND device_id = :device_id
+              AND stopped_at IS NULL
+            """
+        ),
+        {
+            "session_id": body.session_id.strip(),
+            "key": key,
+            "device_id": did,
+            "ttl_sec": SESSION_TTL_SEC,
+        },
+    )
+    db.commit()
+    return {"ok": True, "renewed": (result.rowcount or 0) > 0, "ttl_sec": SESSION_TTL_SEC}
 
 
 def _fetch_exits_least_loaded(db: Session, *, limit: int, pool: str | None = None) -> list[Any]:
@@ -296,29 +432,13 @@ def _fetch_bridges_by_group(db: Session, *, group_ids: list[str], pool: str | No
 
 def _pick_best_tier_random(rows: list[Any], *, k: int) -> list[Any]:
     """
-    Выбирает k серверов без повторов из всего набора кандидатов.
-    Приоритет у менее нагруженных:
-      weight = 1 / ((load + 1) ** EDGE_LOAD_WEIGHT_POWER)
-
-    Это даёт динамический рейтинг: при росте нагрузки сервер
-    автоматически теряет шанс попадания в выдачу, и выше поднимаются
-    менее нагруженные.
+    Простая стратегия: случайно выбрать k серверов из уже подготовленного top-N.
+    Ранжирование и подготовка top-N выполняются на стороне backend/worker.
     """
     if not rows or k <= 0:
         return []
-    pool = list(rows)
-    picked: list[Any] = []
-    while pool and len(picked) < k:
-        weights = []
-        for r in pool:
-            load = max(0, int(r.get("load", 0)))
-            w = 1.0 / ((float(load) + 1.0) ** EDGE_LOAD_WEIGHT_POWER)
-            weights.append(max(w, 1e-9))
-        chosen = random.choices(pool, weights=weights, k=1)[0]
-        picked.append(chosen)
-        chosen_id = int(chosen["id"])
-        pool = [r for r in pool if int(r["id"]) != chosen_id]
-    return picked
+    kk = min(k, len(rows))
+    return random.sample(rows, k=kk)
 
 
 def _append_direct_unique(out: list[dict[str, Any]], rows: list[Any], *, cap: int) -> None:
@@ -341,6 +461,18 @@ def _append_direct_unique(out: list[dict[str, Any]], rows: list[Any], *, cap: in
             return
 
 
+def _append_servers_unique(out: list[dict[str, Any]], rows: list[dict[str, Any]], *, cap: int) -> None:
+    used_ids = {int(item["id"]) for item in out if "id" in item}
+    for srv in rows:
+        sid = int(srv["id"])
+        if sid in used_ids:
+            continue
+        out.append(srv)
+        used_ids.add(sid)
+        if len(out) >= cap:
+            return
+
+
 @router.post("/config")
 def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     """
@@ -354,6 +486,17 @@ def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[st
         raise HTTPException(status_code=403, detail="subscription_required")
     if auth_error == "internal_error":
         raise HTTPException(status_code=500, detail="internal_error")
+
+    cached = load_top_candidates()
+    if cached:
+        chosen_direct_cached = _pick_best_tier_random(list(cached.get("direct") or []), k=RETURN_DIRECT)
+        chosen_bypass_cached = _pick_best_tier_random(list(cached.get("bypass") or []), k=RETURN_BYPASS)
+        servers_cached: list[dict[str, Any]] = []
+        _append_servers_unique(servers_cached, chosen_direct_cached, cap=RETURN_PAIRS)
+        _append_servers_unique(servers_cached, chosen_bypass_cached, cap=RETURN_PAIRS)
+        if len(servers_cached) >= RETURN_PAIRS:
+            logger.info("edge_config: device_id=%s returned=%s source=cache", body.device_id, len(servers_cached))
+            return {"key": resolved_key, "servers": servers_cached}
 
     direct_rows, bypass_rows = _fetch_exits_least_loaded_split(db, limit=TOP_LEAST_LOADED)
 

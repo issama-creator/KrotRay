@@ -1,5 +1,6 @@
 """FastAPI приложение для API Mini App (Итерация 6.2: фоновая задача просроченных)."""
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,21 +12,28 @@ from api.payments import router as payments_router
 from api.routes import router
 from workers.cp_health import run_cp_health
 from workers.cp_server_decay import run_cp_server_load_decay
-from workers.edge_health import run_edge_health
+from workers.edge_maintenance import run_edge_maintenance
 from workers.vpn_connections_cleanup import run_vpn_connections_cleanup
 from workers.vpn_server_balancer import run_vpn_server_balancer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_background_jobs = os.getenv("RUN_BACKGROUND_JOBS_IN_API", "0").strip().lower() in {"1", "true", "yes"}
+    if not run_background_jobs:
+        yield
+        return
+
     from apscheduler.schedulers.background import BackgroundScheduler
+
     scheduler = BackgroundScheduler()
     scheduler.add_job(run_expired_subscriptions, "interval", minutes=5, id="expired_subs")
     scheduler.add_job(run_cp_health, "interval", seconds=120, id="cp_health")
     scheduler.add_job(run_cp_server_load_decay, "interval", minutes=2, id="cp_server_decay")
-    scheduler.add_job(run_edge_health, "interval", seconds=30, id="edge_health")
+    scheduler.add_job(run_edge_maintenance, "interval", seconds=15, id="edge_maintenance")
     scheduler.add_job(run_vpn_server_balancer, "interval", seconds=5, id="vpn_server_balancer")
     scheduler.add_job(run_vpn_connections_cleanup, "interval", minutes=5, id="vpn_connections_cleanup")
+    run_edge_maintenance()
     scheduler.start()
     yield
     scheduler.shutdown(wait=False)

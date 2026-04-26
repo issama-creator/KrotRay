@@ -11,3 +11,4 @@ grpcio-tools>=1.76.0
 protobuf>=4.25.0
 apscheduler>=3.10.0
 requests>=2.31.0
+redis>=5.0.0
