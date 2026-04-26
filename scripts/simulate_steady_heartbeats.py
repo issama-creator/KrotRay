@@ -45,7 +45,26 @@ class PingResult:
     error: str | None
 
 
-def _post_config(base_url: str, device_id: str) -> tuple[bool, ClientState | None, str | None]:
+def _pick_server_from_config(servers: list[dict], mode_policy: str) -> dict | None:
+    if not servers:
+        return None
+    direct = [s for s in servers if str(s.get("mode") or "") == "direct"]
+    bypass = [s for s in servers if str(s.get("mode") or "") == "bypass"]
+
+    if mode_policy == "nl":
+        return random.choice(direct) if direct else random.choice(servers)
+    if mode_policy == "bypass":
+        return random.choice(bypass) if bypass else random.choice(servers)
+    if mode_policy == "balanced":
+        if direct and bypass:
+            pick_direct = bool(random.getrandbits(1))
+            return random.choice(direct if pick_direct else bypass)
+        return random.choice(servers)
+    # random
+    return random.choice(servers)
+
+
+def _post_config(base_url: str, device_id: str, mode_policy: str) -> tuple[bool, ClientState | None, str | None]:
     s = requests.Session()
     try:
         r = s.post(
@@ -63,8 +82,9 @@ def _post_config(base_url: str, device_id: str) -> tuple[bool, ClientState | Non
         if not servers:
             return False, None, "config_empty_servers"
 
-        # Берем случайный выданный сервер, чтобы в steady-тесте не было перекоса только в first server.
-        picked = random.choice(servers)
+        picked = _pick_server_from_config(servers, mode_policy=mode_policy)
+        if picked is None:
+            return False, None, "config_pick_failed"
         sid = picked.get("id")
         if sid is None:
             return False, None, "config_server_id_missing"
@@ -96,12 +116,12 @@ def _post_ping(base_url: str, state: ClientState) -> PingResult:
         return PingResult(False, latency_ms, state.server_id, f"ping_exc:{e!s}"[:180])
 
 
-def _bootstrap_clients(base_url: str, users: int, workers: int) -> list[ClientState]:
+def _bootstrap_clients(base_url: str, users: int, workers: int, mode_policy: str) -> list[ClientState]:
     states: list[ClientState] = []
     errors: Counter[str] = Counter()
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [
-            pool.submit(_post_config, base_url, f"steady-{i}-{uuid.uuid4()}")
+            pool.submit(_post_config, base_url, f"steady-{i}-{uuid.uuid4()}", mode_policy)
             for i in range(users)
         ]
         for fut in as_completed(futures):
@@ -161,6 +181,12 @@ def main() -> int:
     p.add_argument("--duration-sec", type=int, default=600, help="Total test duration in seconds")
     p.add_argument("--interval-sec", type=int, default=60, help="Ping interval per client in seconds")
     p.add_argument("--workers", type=int, default=80, help="Thread pool size for parallel requests")
+    p.add_argument(
+        "--mode-policy",
+        choices=["random", "balanced", "nl", "bypass"],
+        default="balanced",
+        help="How to pick server from /config response",
+    )
     args = p.parse_args()
 
     if args.users <= 0 or args.duration_sec <= 0 or args.interval_sec <= 0 or args.workers <= 0:
@@ -176,7 +202,7 @@ def main() -> int:
         )
     )
 
-    states = _bootstrap_clients(args.base_url, args.users, args.workers)
+    states = _bootstrap_clients(args.base_url, args.users, args.workers, args.mode_policy)
     if not states:
         print("no clients ready; stop")
         return 1
