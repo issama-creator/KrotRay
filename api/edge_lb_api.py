@@ -40,6 +40,7 @@ EDGE_POOL_BYPASS = os.getenv("EDGE_POOL_BYPASS", "bypass")
 EDGE_POOL_SHARED = os.getenv("EDGE_POOL_SHARED", "shared")
 TRIAL_DAYS = 3
 EDGE_LOAD_TIE_BREAK = os.getenv("EDGE_LOAD_TIE_BREAK", "random").strip().lower()
+EDGE_LOAD_WEIGHT_POWER = float(os.getenv("EDGE_LOAD_WEIGHT_POWER", "1.3"))
 
 
 class ConfigBody(BaseModel):
@@ -432,13 +433,31 @@ def _fetch_bridges_by_group(db: Session, *, group_ids: list[str], pool: str | No
 
 def _pick_best_tier_random(rows: list[Any], *, k: int) -> list[Any]:
     """
-    Простая стратегия: случайно выбрать k серверов из уже подготовленного top-N.
-    Ранжирование и подготовка top-N выполняются на стороне backend/worker.
+    Мягкая иерархия: выбираем из top-N со взвешиванием по текущей load.
+    Менее загруженные имеют больший вес, но весь top продолжает участвовать.
     """
     if not rows or k <= 0:
         return []
-    kk = min(k, len(rows))
-    return random.sample(rows, k=kk)
+    pool = list(rows)
+    picked: list[Any] = []
+    kk = min(k, len(pool))
+    for _ in range(kk):
+        if not pool:
+            break
+        weights = []
+        for row in pool:
+            load = float(row.get("load", 0) or 0)
+            load = max(0.0, load)
+            weight = 1.0 / ((load + 1.0) ** EDGE_LOAD_WEIGHT_POWER)
+            weights.append(max(weight, 1e-9))
+        if sum(weights) <= 0:
+            picked.extend(random.sample(pool, k=min(kk - len(picked), len(pool))))
+            break
+        chosen = random.choices(pool, weights=weights, k=1)[0]
+        picked.append(chosen)
+        chosen_id = int(chosen["id"])
+        pool = [row for row in pool if int(row["id"]) != chosen_id]
+    return picked
 
 
 def _append_direct_unique(out: list[dict[str, Any]], rows: list[Any], *, cap: int) -> None:

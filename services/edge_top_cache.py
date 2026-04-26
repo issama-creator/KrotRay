@@ -173,6 +173,7 @@ def build_top_candidates_payload(db: Session) -> dict[str, Any]:
             "port": 443,
             "mode": "direct",
             "pool": ex["pool"],
+            "load": int(ex.get("load") or 0),
         }
         for ex in direct_rows
     ]
@@ -192,6 +193,7 @@ def build_top_candidates_payload(db: Session) -> dict[str, Any]:
                 "port": 443,
                 "mode": "bypass",
                 "pool": ex["pool"],
+                "load": int(ex.get("load") or 0),
                 "bridge": {
                     "id": int(bridge["id"]),
                     "host": bridge["host"],
