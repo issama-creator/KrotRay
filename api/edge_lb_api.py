@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["edge-lb"])
 
-# Временно расширили окно «онлайн» для тестов, чтобы нагрузка не обнулялась каждые 90 сек.
-ONLINE_SEC = 86400
+# Окно "онлайн" для расчета нагрузки. В проде лучше держать коротким, чтобы /config не считал сутки.
+ONLINE_SEC = int(os.getenv("EDGE_ONLINE_SEC", "180"))
 # Из топа наименее загруженных выбираем случайные.
 TOP_LEAST_LOADED = 10
 RETURN_PAIRS = 4
@@ -200,6 +200,60 @@ def _fetch_exits_least_loaded(db: Session, *, limit: int, pool: str | None = Non
     )
 
 
+def _fetch_exits_least_loaded_split(db: Session, *, limit: int) -> tuple[list[Any], list[Any]]:
+    """
+    Faster variant for split pools: compute load aggregation once, then rank inside each pool.
+    Returns (direct_rows, bypass_rows).
+    """
+    sql = """
+        WITH load_by_server AS (
+            SELECT d.server_id, COUNT(*)::int AS c
+            FROM edge_devices d
+            WHERE d.last_seen > NOW() - (:online_sec * INTERVAL '1 second')
+            GROUP BY d.server_id
+        ),
+        ranked AS (
+            SELECT
+                s.id,
+                s.name,
+                s.host,
+                s.group_id,
+                COALESCE(s.pool, :shared_pool) AS pool,
+                COALESCE(l.c, 0)::int AS load,
+                ROW_NUMBER() OVER (
+                    PARTITION BY COALESCE(s.pool, :shared_pool)
+                    ORDER BY COALESCE(l.c, 0) ASC, s.id ASC
+                ) AS rn
+            FROM edge_servers s
+            LEFT JOIN load_by_server l ON l.server_id = s.id
+            WHERE s.type = 'exit'
+              AND s.is_active = true
+              AND COALESCE(s.pool, :shared_pool) IN (:direct_pool, :bypass_pool)
+        )
+        SELECT id, name, host, group_id, pool, load
+        FROM ranked
+        WHERE rn <= :top_n
+        ORDER BY pool ASC, load ASC, id ASC
+    """
+    rows = list(
+        db.execute(
+            text(sql),
+            {
+                "online_sec": ONLINE_SEC,
+                "top_n": limit,
+                "shared_pool": EDGE_POOL_SHARED,
+                "direct_pool": EDGE_POOL_DIRECT,
+                "bypass_pool": EDGE_POOL_BYPASS,
+            },
+        )
+        .mappings()
+        .all()
+    )
+    direct_rows = [r for r in rows if str(r["pool"]) == EDGE_POOL_DIRECT]
+    bypass_rows = [r for r in rows if str(r["pool"]) == EDGE_POOL_BYPASS]
+    return direct_rows, bypass_rows
+
+
 def _fetch_bridges_by_group(db: Session, *, group_ids: list[str], pool: str | None = None) -> dict[str, Any]:
     if not group_ids:
         return {}
@@ -294,8 +348,7 @@ def post_edge_config(body: ConfigBody, db: Session = Depends(get_db)) -> dict[st
     if auth_error == "internal_error":
         raise HTTPException(status_code=500, detail="internal_error")
 
-    direct_rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED, pool=EDGE_POOL_DIRECT)
-    bypass_rows = _fetch_exits_least_loaded(db, limit=TOP_LEAST_LOADED, pool=EDGE_POOL_BYPASS)
+    direct_rows, bypass_rows = _fetch_exits_least_loaded_split(db, limit=TOP_LEAST_LOADED)
 
     chosen_direct = _pick_best_tier_random(direct_rows, k=RETURN_DIRECT)
     chosen_bypass_exits = _pick_best_tier_random(bypass_rows, k=RETURN_BYPASS)
