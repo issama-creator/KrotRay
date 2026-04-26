@@ -47,11 +47,18 @@ def _ping_url(base_url: str) -> str:
     return f"{base_url.rstrip('/')}/ping"
 
 
-def _run_user(base_url: str, user_key: str, do_ping: bool) -> UserResult:
+def _run_user(base_url: str, user_key: str, do_ping: bool, config_mode: str) -> UserResult:
     started = time.perf_counter()
     s = requests.Session()
     try:
-        r = s.get(_config_url(base_url), params={"key": user_key}, timeout=CONFIG_TIMEOUT)
+        if config_mode == "edge":
+            r = s.post(
+                _config_url(base_url),
+                json={"device_id": f"dev-{user_key}", "key": None},
+                timeout=CONFIG_TIMEOUT,
+            )
+        else:
+            r = s.get(_config_url(base_url), params={"key": user_key}, timeout=CONFIG_TIMEOUT)
         latency_ms = (time.perf_counter() - started) * 1000.0
         if r.status_code != 200:
             return UserResult(False, latency_ms, (), f"config_http_{r.status_code}")
@@ -76,11 +83,24 @@ def _run_user(base_url: str, user_key: str, do_ping: bool) -> UserResult:
         return UserResult(False, latency_ms, (), f"exc:{e!s}"[:200])
 
 
-def _run_batch(base_url: str, users: int, workers: int, do_ping: bool, key_prefix: str) -> list[UserResult]:
+def _run_batch(
+    base_url: str,
+    users: int,
+    workers: int,
+    do_ping: bool,
+    key_prefix: str,
+    config_mode: str,
+) -> list[UserResult]:
     results: list[UserResult] = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [
-            pool.submit(_run_user, base_url, f"{key_prefix}-{i}-{random.randint(1, 10_000_000)}", do_ping)
+            pool.submit(
+                _run_user,
+                base_url,
+                f"{key_prefix}-{i}-{random.randint(1, 10_000_000)}",
+                do_ping,
+                config_mode,
+            )
             for i in range(users)
         ]
         for f in as_completed(futures):
@@ -173,6 +193,7 @@ def run_ramp(args: argparse.Namespace) -> int:
                 workers=args.workers,
                 do_ping=args.do_ping,
                 key_prefix=f"ramp-{users}",
+                config_mode=args.config_mode,
             )
             _summarize(batch, title=f"RAMP users={users}")
             if args.pause_seconds > 0:
@@ -196,6 +217,7 @@ def run_spike(args: argparse.Namespace) -> int:
         workers=args.workers,
         do_ping=args.do_ping,
         key_prefix="spike",
+        config_mode=args.config_mode,
     )
     elapsed = time.perf_counter() - t0
     summary = _summarize(batch, title="SPIKE")
@@ -215,6 +237,7 @@ def run_failover(args: argparse.Namespace) -> int:
         workers=args.workers,
         do_ping=args.do_ping,
         key_prefix="failover-before",
+        config_mode=args.config_mode,
     )
     before_summary = _summarize(before, title="FAILOVER before")
     if not before_summary["server_counter"]:
@@ -240,6 +263,7 @@ def run_failover(args: argparse.Namespace) -> int:
         workers=args.workers,
         do_ping=args.do_ping,
         key_prefix="failover-after",
+        config_mode=args.config_mode,
     )
     after_summary = _summarize(after, title="FAILOVER after")
     still_served = int(after_summary["server_counter"].get(target_server_id, 0))
@@ -267,6 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--stage-seconds", type=int, default=300, help="Duration per stage (5 min default)")
     pr.add_argument("--pause-seconds", type=int, default=5)
     pr.add_argument("--do-ping", action="store_true", help="Also call POST /ping per user")
+    pr.add_argument("--config-mode", choices=["edge", "vpn"], default="edge")
     pr.set_defaults(func=run_ramp)
 
     ps = sub.add_parser("spike", help="Sudden burst test")
@@ -274,6 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--users", type=int, default=1000)
     ps.add_argument("--workers", type=int, default=250)
     ps.add_argument("--do-ping", action="store_true", help="Also call POST /ping per user")
+    ps.add_argument("--config-mode", choices=["edge", "vpn"], default="edge")
     ps.add_argument("--latency-ok-ms", type=float, default=200.0)
     ps.set_defaults(func=run_spike)
 
@@ -282,6 +308,7 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--users", type=int, default=400)
     pf.add_argument("--workers", type=int, default=120)
     pf.add_argument("--do-ping", action="store_true", help="Also call POST /ping per user")
+    pf.add_argument("--config-mode", choices=["edge", "vpn"], default="edge")
     pf.add_argument("--database-url", default="", help="Optional DB url to auto-mark server dead")
     pf.add_argument("--wait-after-fail-s", type=int, default=10, help="Wait for workers to react")
     pf.set_defaults(func=run_failover)
