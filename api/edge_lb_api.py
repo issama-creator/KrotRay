@@ -39,6 +39,7 @@ EDGE_POOL_BYPASS = os.getenv("EDGE_POOL_BYPASS", "bypass")
 EDGE_POOL_SHARED = os.getenv("EDGE_POOL_SHARED", "shared")
 TRIAL_DAYS = 3
 EDGE_LOAD_TIE_BREAK = os.getenv("EDGE_LOAD_TIE_BREAK", "random").strip().lower()
+EDGE_LOAD_WEIGHT_POWER = float(os.getenv("EDGE_LOAD_WEIGHT_POWER", "1.4"))
 
 
 class ConfigBody(BaseModel):
@@ -295,30 +296,29 @@ def _fetch_bridges_by_group(db: Session, *, group_ids: list[str], pool: str | No
 
 def _pick_best_tier_random(rows: list[Any], *, k: int) -> list[Any]:
     """
-    Из уже отсортированных по load ASC строк выбираем случайные k,
-    но только из "лучшего" набора: включаем следующий tier нагрузки
-    только если иначе не набирается k кандидатов.
+    Выбирает k серверов без повторов из всего набора кандидатов.
+    Приоритет у менее нагруженных:
+      weight = 1 / ((load + 1) ** EDGE_LOAD_WEIGHT_POWER)
+
+    Это даёт динамический рейтинг: при росте нагрузки сервер
+    автоматически теряет шанс попадания в выдачу, и выше поднимаются
+    менее нагруженные.
     """
     if not rows or k <= 0:
         return []
-
-    # rows уже ORDER BY load ASC, id ASC
-    cutoff_load: int | None = None
-    count = 0
-    for r in rows:
-        if cutoff_load is None:
-            cutoff_load = int(r["load"])
-        if int(r["load"]) != cutoff_load and count >= k:
-            break
-        cutoff_load = int(r["load"])
-        count += 1
-
-    if cutoff_load is None:
-        return []
-
-    candidates = [r for r in rows if int(r["load"]) <= cutoff_load]
-    kk = min(k, len(candidates))
-    return random.sample(candidates, k=kk)
+    pool = list(rows)
+    picked: list[Any] = []
+    while pool and len(picked) < k:
+        weights = []
+        for r in pool:
+            load = max(0, int(r.get("load", 0)))
+            w = 1.0 / ((float(load) + 1.0) ** EDGE_LOAD_WEIGHT_POWER)
+            weights.append(max(w, 1e-9))
+        chosen = random.choices(pool, weights=weights, k=1)[0]
+        picked.append(chosen)
+        chosen_id = int(chosen["id"])
+        pool = [r for r in pool if int(r["id"]) != chosen_id]
+    return picked
 
 
 def _append_direct_unique(out: list[dict[str, Any]], rows: list[Any], *, cap: int) -> None:
