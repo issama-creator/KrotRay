@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import Float, cast, func, nulls_last, select
+from sqlalchemy import Float, cast, func, nulls_last, select, text
 from sqlalchemy.orm import Session, joinedload
 
 from api.cp_subscription_sync import effective_subscription_until
@@ -19,6 +19,7 @@ from db.models.cp_server import CpServer
 from db.models.cp_user import CpUser
 from db.models.device import Device
 from db.session import get_session
+from services.vpn_balancer import get_candidate_servers, weighted_sample
 
 logger = logging.getLogger(__name__)
 
@@ -260,9 +261,37 @@ def _build_test_config(nl: CpServer) -> dict:
 
 @router.get("/config")
 def get_config(
+    key: Annotated[str | None, Query(description="Ключ клиента")] = None,
     device_id: Annotated[str | None, Query(description="UUID устройства")] = None,
     db: Session = Depends(get_db),
 ) -> dict:
+    if key:
+        try:
+            candidates = get_candidate_servers(db)
+            picked = weighted_sample(candidates, k=4)
+            if not picked:
+                picked = candidates[:4]
+            return {
+                "key": key,
+                "servers": [{"id": int(s["id"]), "host": str(s["host"])} for s in picked],
+            }
+        except Exception:
+            logger.exception("vpn /config fallback for key=%s", key)
+            fallback_rows = db.execute(
+                text(
+                    """
+                    SELECT id, host
+                    FROM servers
+                    ORDER BY score ASC, id ASC
+                    LIMIT 4
+                    """
+                )
+            ).mappings().all()
+            return {
+                "key": key,
+                "servers": [{"id": int(s["id"]), "host": str(s["host"])} for s in fallback_rows],
+            }
+
     # Быстрый тестовый режим: /config без параметров возвращает конфиг без проверки подписки.
     if not device_id:
         _ensure_test_servers_if_empty(db)

@@ -139,6 +139,19 @@ def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
     if row[1] != "exit":
         raise HTTPException(status_code=400, detail="server_id must be an exit server")
 
+    ping_too_soon = db.execute(
+        text(
+            """
+            SELECT (last_seen > NOW() - INTERVAL '30 seconds') AS too_soon
+            FROM edge_devices
+            WHERE device_id = :device_id
+            """
+        ),
+        {"device_id": did},
+    ).scalar_one_or_none()
+    if bool(ping_too_soon):
+        return {"ok": True}
+
     # PostgreSQL: ON CONFLICT по уникальному device_id
     db.execute(
         text(
