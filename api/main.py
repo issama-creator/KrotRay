@@ -11,6 +11,7 @@ from api.payments import router as payments_router
 from api.routes import router
 from workers.cp_health import run_cp_health
 from workers.cp_server_decay import run_cp_server_load_decay
+from workers.edge_health import run_edge_health
 from workers.vpn_connections_cleanup import run_vpn_connections_cleanup
 from workers.vpn_server_balancer import run_vpn_server_balancer
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(run_expired_subscriptions, "interval", minutes=5, id="expired_subs")
     scheduler.add_job(run_cp_health, "interval", seconds=120, id="cp_health")
     scheduler.add_job(run_cp_server_load_decay, "interval", minutes=2, id="cp_server_decay")
+    scheduler.add_job(run_edge_health, "interval", seconds=30, id="edge_health")
     scheduler.add_job(run_vpn_server_balancer, "interval", seconds=5, id="vpn_server_balancer")
     scheduler.add_job(run_vpn_connections_cleanup, "interval", minutes=5, id="vpn_connections_cleanup")
     scheduler.start()
