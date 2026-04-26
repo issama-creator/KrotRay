@@ -38,6 +38,7 @@ EDGE_POOL_DIRECT = os.getenv("EDGE_POOL_DIRECT", "nl")
 EDGE_POOL_BYPASS = os.getenv("EDGE_POOL_BYPASS", "bypass")
 EDGE_POOL_SHARED = os.getenv("EDGE_POOL_SHARED", "shared")
 TRIAL_DAYS = 3
+EDGE_LOAD_TIE_BREAK = os.getenv("EDGE_LOAD_TIE_BREAK", "random").strip().lower()
 
 
 class ConfigBody(BaseModel):
@@ -172,6 +173,7 @@ def post_ping(body: PingBody, db: Session = Depends(get_db)) -> dict[str, bool]:
 
 
 def _fetch_exits_least_loaded(db: Session, *, limit: int, pool: str | None = None) -> list[Any]:
+    tie_break_order = "RANDOM()" if EDGE_LOAD_TIE_BREAK == "random" else "s.id ASC"
     sql = """
             SELECT
                 s.id,
@@ -189,9 +191,10 @@ def _fetch_exits_least_loaded(db: Session, *, limit: int, pool: str | None = Non
             ) cnt ON cnt.server_id = s.id
             WHERE s.type = 'exit' AND s.is_active = true
               AND (:pool IS NULL OR COALESCE(s.pool, :shared_pool) = :pool)
-            ORDER BY load ASC, s.id ASC
+            ORDER BY load ASC, __TIE_BREAK__
             LIMIT :top_n
             """
+    sql = sql.replace("__TIE_BREAK__", tie_break_order)
     return list(
         db.execute(
             text(sql),
@@ -207,6 +210,7 @@ def _fetch_exits_least_loaded_split(db: Session, *, limit: int) -> tuple[list[An
     Faster variant for split pools: compute load aggregation once, then rank inside each pool.
     Returns (direct_rows, bypass_rows).
     """
+    tie_break_order = "RANDOM()" if EDGE_LOAD_TIE_BREAK == "random" else "s.id ASC"
     sql = """
         WITH load_by_server AS (
             SELECT d.server_id, COUNT(*)::int AS c
@@ -224,7 +228,7 @@ def _fetch_exits_least_loaded_split(db: Session, *, limit: int) -> tuple[list[An
                 COALESCE(l.c, 0)::int AS load,
                 ROW_NUMBER() OVER (
                     PARTITION BY COALESCE(s.pool, :shared_pool)
-                    ORDER BY COALESCE(l.c, 0) ASC, s.id ASC
+                    ORDER BY COALESCE(l.c, 0) ASC, __TIE_BREAK__
                 ) AS rn
             FROM edge_servers s
             LEFT JOIN load_by_server l ON l.server_id = s.id
@@ -237,6 +241,7 @@ def _fetch_exits_least_loaded_split(db: Session, *, limit: int) -> tuple[list[An
         WHERE rn <= :top_n
         ORDER BY pool ASC, load ASC, id ASC
     """
+    sql = sql.replace("__TIE_BREAK__", tie_break_order)
     rows = list(
         db.execute(
             text(sql),
