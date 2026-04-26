@@ -20,16 +20,14 @@ def run_edge_maintenance() -> None:
     run_edge_sessions_cleanup()
     run_edge_top_cache_refresh()
 
-    # TEMP: disable health checks during load tests to prevent mass deactivation.
-    should_run_health = False
-    # now_mono = time.monotonic()
-    # should_run_health = (
-    #     _last_health_run_monotonic <= 0.0
-    #     or (now_mono - _last_health_run_monotonic) >= max(1, EDGE_HEALTH_INTERVAL_SEC)
-    # )
-    # if should_run_health:
-    #     run_edge_health()
-    #     _last_health_run_monotonic = now_mono
+    now_mono = time.monotonic()
+    should_run_health = (
+        _last_health_run_monotonic <= 0.0
+        or (now_mono - _last_health_run_monotonic) >= max(1, EDGE_HEALTH_INTERVAL_SEC)
+    )
+    if should_run_health:
+        run_edge_health()
+        _last_health_run_monotonic = now_mono
 
     logger.info("edge_maintenance: cleanup+cache_refresh done health=%s", should_run_health)
 
