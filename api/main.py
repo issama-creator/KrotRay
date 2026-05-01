@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.key_factory_api import router as key_factory_router
 from api.payments import router as payments_router
+from api.routes import router as mini_app_router
 
 
 app = FastAPI(title="KrotRay Key Factory API", version="1.0.0")
@@ -22,4 +23,5 @@ app.add_middleware(
 )
 
 app.include_router(key_factory_router)
+app.include_router(mini_app_router)
 app.include_router(payments_router, prefix="/api/payments")

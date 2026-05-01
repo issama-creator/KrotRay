@@ -1,13 +1,16 @@
 """
 Просмотр данных из базы данных.
 Использование:
-    python scripts/view_db.py                    # Показать все подписки
-    python scripts/view_db.py --users            # Показать всех пользователей
-    python scripts/view_db.py --payments         # Показать все платежи
-    python scripts/view_db.py --servers          # Показать все серверы
-    python scripts/view_db.py --subscription-id 1 # Показать конкретную подписку
+    python scripts/view_db.py                         # Подписки + статистика
+    python scripts/view_db.py --users               # Пользователи: все поля
+    python scripts/view_db.py --users --json        # То же в JSON
+    python scripts/view_db.py --users --limit 200
+    python scripts/view_db.py --payments            # Платежи
+    python scripts/view_db.py --servers             # Серверы (legacy Xray)
+    python scripts/view_db.py --subscription-id 1   # Одна подписка по ID
 """
 import argparse
+import json
 import os
 import sys
 from datetime import datetime
@@ -24,8 +27,26 @@ def format_datetime(dt):
     if not dt:
         return "—"
     if isinstance(dt, datetime):
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
+        return dt.strftime("%Y-%m-%d %H:%M:%S %Z").strip()
     return str(dt)
+
+
+def user_to_public_dict(user: User) -> dict:
+    """Все поля users для вывода / JSON (удобно смотреть в админке)."""
+    return {
+        "id": user.id,
+        "telegram_id": user.telegram_id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "platform": user.platform,
+        "device_stable_id": user.device_stable_id,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+        "telegram_linked_at": user.telegram_linked_at.isoformat() if user.telegram_linked_at else None,
+        "subscription_expires_at": user.subscription_expires_at.isoformat()
+        if user.subscription_expires_at
+        else None,
+    }
 
 
 def print_subscriptions(db, subscription_id=None):
@@ -57,34 +78,51 @@ def print_subscriptions(db, subscription_id=None):
     print(f"\nВсего показано: {len(results)}")
 
 
-def print_users(db):
-    """Вывести пользователей."""
-    users = db.execute(select(User).order_by(User.id.desc()).limit(50)).scalars().all()
-    
+def print_users(db, *, limit: int = 100, as_json: bool = False):
+    """Все поля таблицы users — блоками (удобно читать и сверять)."""
+    users = db.execute(select(User).order_by(User.id.desc()).limit(limit)).scalars().all()
+
     if not users:
         print("Пользователи не найдены.")
         return
-    
-    print("\n" + "=" * 80)
-    print(f"{'ID':<5} {'Telegram ID':<15} {'Username':<25} {'First Name':<20}")
-    print("=" * 80)
-    
-    for user in users:
-        username = user.username or "—"
-        first_name = user.first_name or "—"
-        print(f"{user.id:<5} {user.telegram_id:<15} {username:<25} {first_name:<20}")
-    
-    print("=" * 80)
-    print(f"\nВсего показано: {len(users)}")
+
+    rows = [user_to_public_dict(u) for u in users]
+    if as_json:
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        print(f"\n# записей: {len(rows)}")
+        return
+
+    print("\n" + "=" * 72)
+    print(f"ПОЛЬЗОВАТЕЛИ (последние {len(users)}, новые сверху)")
+    print("=" * 72)
+    for u in users:
+        d = user_to_public_dict(u)
+        print(f"\n--- account_id={d['id']} ---")
+        for k, v in d.items():
+            label = {
+                "id": "id",
+                "telegram_id": "telegram_id",
+                "username": "username",
+                "first_name": "first_name",
+                "platform": "platform",
+                "device_stable_id": "device_stable_id",
+                "created_at": "created_at (триал отсчёт)",
+                "updated_at": "updated_at",
+                "telegram_linked_at": "telegram_linked_at",
+                "subscription_expires_at": "subscription_expires_at (оплата)",
+            }.get(k, k)
+            print(f"  {label:<34} {v if v is not None else '—'}")
+    print("\n" + "=" * 72)
+    print(f"Всего показано: {len(users)}")
 
 
-def print_payments(db):
+def print_payments(db, *, limit: int = 100):
     """Вывести платежи."""
     payments = db.execute(
         select(Payment, User)
         .join(User)
         .order_by(Payment.created_at.desc())
-        .limit(50)
+        .limit(limit)
     ).all()
     
     if not payments:
@@ -154,7 +192,14 @@ def print_stats(db):
 
 def main():
     parser = argparse.ArgumentParser(description="Просмотр данных из БД")
-    parser.add_argument("--users", action="store_true", help="Показать пользователей")
+    parser.add_argument("--users", action="store_true", help="Показать пользователей (все поля)")
+    parser.add_argument("--json", action="store_true", help="С --users: вывод JSON")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Лимит записей для --users и --payments (по умолчанию 100)",
+    )
     parser.add_argument("--payments", action="store_true", help="Показать платежи")
     parser.add_argument("--servers", action="store_true", help="Показать серверы")
     parser.add_argument("--stats", action="store_true", help="Показать статистику")
@@ -164,9 +209,9 @@ def main():
     db = SessionLocal()
     try:
         if args.users:
-            print_users(db)
+            print_users(db, limit=args.limit, as_json=args.json)
         elif args.payments:
-            print_payments(db)
+            print_payments(db, limit=args.limit)
         elif args.servers:
             print_servers(db)
         elif args.stats:

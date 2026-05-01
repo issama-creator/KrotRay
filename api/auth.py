@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -81,6 +82,7 @@ def get_or_create_user(session: Session, telegram_id: int, username: str | None,
         telegram_id=telegram_id,
         username=username,
         first_name=first_name,
+        telegram_linked_at=datetime.now(timezone.utc),
     )
     session.add(user)
     session.commit()
