@@ -1,0 +1,8 @@
+{
+  "servers": [
+    {"id": "wifi-a", "type": "wifi", "host": "203.0.113.10", "max": 180},
+    {"id": "wifi-b", "type": "wifi", "host": "203.0.113.11", "max": 180},
+    {"id": "bypass-a", "type": "bypass", "host": "203.0.113.12", "max": 180},
+    {"id": "bypass-b", "type": "bypass", "host": "203.0.113.13", "max": 180}
+  ]
+}

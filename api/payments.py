@@ -1,5 +1,6 @@
 """Платежи ЮKassa (Итерация 5) + Xray доступ (Итерация 6.1)."""
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.auth import get_or_create_user, verify_init_data
+from api.minimal_subscription import bump_subscription_expires_at
 from api.cp_subscription_sync import sync_cp_after_payment_success
 from api.server import get_least_loaded_server
 from api.xray_grpc import add_user_to_xray
@@ -18,6 +20,9 @@ from db.session import get_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["payments"])
+
+# 1 — webhook только продлевает users.subscription_expires_at (+ статус payment), без Subscription/Xray/cp
+MINIMAL_PAYMENT_WEBHOOK = os.getenv("MINIMAL_PAYMENT_WEBHOOK", "0").strip().lower() in {"1", "true", "yes"}
 
 TARIFFS = {
     "1m": (1, 100),       # 1 месяц, базовая цена за 1 устройство
@@ -238,6 +243,17 @@ def webhook(request: dict, db: Session = Depends(get_db)):
 
         payment.status = "completed"
         db.commit()
+
+        bump_subscription_expires_at(db, user_id=payment.user_id, tariff_months=payment.tariff_months)
+        db.commit()
+
+        if MINIMAL_PAYMENT_WEBHOOK:
+            logger.info(
+                "Webhook MINIMAL: subscription_expires_at bumped user_id=%s months=%s",
+                payment.user_id,
+                payment.tariff_months,
+            )
+            return {"ok": True}
 
         now = datetime.now(timezone.utc)
         days_per_month = 30  # 1 мес = 30 дней, 3 мес = 90 дней

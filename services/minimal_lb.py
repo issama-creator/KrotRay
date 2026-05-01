@@ -244,8 +244,13 @@ def pick_servers_dual(servers: list[RuntimeServer]) -> list[dict[str, Any]]:
     return unique
 
 
-def get_cached_user(client: redis.Redis, user_id: int) -> dict[str, Any] | None:
-    key = f"user:{user_id}"
+def user_assignment_redis_key(telegram_id: int) -> str:
+    """Кэш назначения серверов привязан к Telegram ID (стабильный внешний ключ)."""
+    return f"user:kf:{telegram_id}"
+
+
+def get_cached_user(client: redis.Redis, telegram_id: int) -> dict[str, Any] | None:
+    key = user_assignment_redis_key(telegram_id)
     data = client.hgetall(key)
     if not data:
         return None
@@ -257,8 +262,8 @@ def get_cached_user(client: redis.Redis, user_id: int) -> dict[str, Any] | None:
     return {"servers": servers, "next_update": next_update}
 
 
-def save_cached_user(client: redis.Redis, user_id: int, servers: list[dict[str, Any]], next_update: float) -> None:
-    key = f"user:{user_id}"
+def save_cached_user(client: redis.Redis, telegram_id: int, servers: list[dict[str, Any]], next_update: float) -> None:
+    key = user_assignment_redis_key(telegram_id)
     payload = {"servers": json.dumps(servers, separators=(",", ":")), "next_update": str(next_update)}
     pipe = client.pipeline()
     pipe.hset(key, mapping=payload)

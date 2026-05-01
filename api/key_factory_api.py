@@ -1,3 +1,8 @@
+"""
+Key factory: выдача 4 серверов (2 wifi + 2 bypass) из Redis, доступ по users + оплата.
+
+Внешний идентификатор клиента — **telegram_id** (тот же пользователь, что в Mini App / платежах).
+"""
 from __future__ import annotations
 
 import logging
@@ -9,9 +14,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from redis import Redis
 from redis.exceptions import LockError
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from api.auth import get_or_create_user
+from db.models.user import User
 from db.session import get_session
 from services.minimal_lb import (
     apply_assign,
@@ -26,16 +32,11 @@ from services.minimal_lb import (
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["key-factory"])
 
-
 TRIAL_DAYS = 3
 REFRESH_COOLDOWN_SEC = 5 * 60
 
 
 def _busy_assignment_headers() -> dict[str, str]:
-    """
-    Подсказка клиенту при contention по локу.
-    Retry-After по RFC — целые секунды; точный backoff с jitter (100–300 ms) — в кастомных заголовках.
-    """
     return {
         "Retry-After": "1",
         "X-Retry-Jitter-Ms-Min": "100",
@@ -43,19 +44,16 @@ def _busy_assignment_headers() -> dict[str, str]:
     }
 
 
-def _user_assignment_lock(redis_client: Redis, user_id: int):
-    """Сериализует первое назначение и refresh для одного user_id (защита от двойного +0.25)."""
-    # timeout — TTL лока в Redis (если процесс умрёт до release). Внутри лока только Redis + CPU (без внешней сети).
-    # blocking_timeout — сколько ждать захват; при истечении — LockError → см. обработчики ниже.
+def _assignment_lock(redis_client: Redis, telegram_id: int):
     return redis_client.lock(
-        f"lock:kf:user:{user_id}",
+        f"lock:kf:tg:{telegram_id}",
         timeout=30,
         blocking_timeout=25,
     )
 
 
 class RefreshBody(BaseModel):
-    user_id: int = Field(..., ge=1)
+    telegram_id: int = Field(..., ge=1, description="Telegram user id (тот же, что в initData)")
 
 
 def get_db():
@@ -66,53 +64,24 @@ def get_db():
         db.close()
 
 
-def _to_utc(value: Any) -> datetime | None:
+def _to_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
-    return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
-def _ensure_user(db: Session, user_id: int) -> dict[str, Any]:
-    row = db.execute(
-        text(
-            """
-            SELECT id, created_at, subscription_expires_at
-            FROM users
-            WHERE id = :user_id
-            """
-        ),
-        {"user_id": user_id},
-    ).mappings().first()
-    if row:
-        return dict(row)
-
-    created = db.execute(
-        text(
-            """
-            INSERT INTO users (id, telegram_id, username, first_name, created_at, subscription_expires_at)
-            VALUES (:user_id, :telegram_id, NULL, NULL, NOW(), NULL)
-            ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
-            RETURNING id, created_at, subscription_expires_at
-            """
-        ),
-        {"user_id": user_id, "telegram_id": user_id},
-    ).mappings().first()
-    db.commit()
-    if created is None:
-        raise HTTPException(status_code=500, detail="user_create_failed")
-    return dict(created)
+def _ensure_user(db: Session, telegram_id: int) -> User:
+    return get_or_create_user(db, telegram_id=telegram_id, username=None, first_name=None)
 
 
-def _has_access(user_row: dict[str, Any], now_dt: datetime) -> bool:
-    created_at = _to_utc(user_row.get("created_at")) or now_dt
+def _has_access(user: User, now_dt: datetime) -> bool:
+    created_at = _to_utc(user.created_at) or now_dt
     trial_until = created_at + timedelta(days=TRIAL_DAYS)
     if now_dt < trial_until:
         return True
-    sub_expires_at = _to_utc(user_row.get("subscription_expires_at"))
+    sub_expires_at = _to_utc(user.subscription_expires_at)
     return bool(sub_expires_at and sub_expires_at > now_dt)
 
 
@@ -129,22 +98,29 @@ def _normalize_servers(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-@router.get("/servers")
-def get_servers(user_id: int = Query(..., ge=1), db: Session = Depends(get_db)) -> dict[str, Any]:
+@router.get(
+    "/servers",
+    summary="Получить закреплённую четвёрку серверов",
+    response_description="Список серверов или subscription_required",
+)
+def get_servers(
+    telegram_id: int = Query(..., ge=1, description="Telegram user id"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
     now_dt = datetime.now(timezone.utc)
-    user = _ensure_user(db, user_id=user_id)
+    user = _ensure_user(db, telegram_id)
     if not _has_access(user, now_dt):
         return {"error": "subscription_required"}
 
     redis_client = get_redis()
-    cached = get_cached_user(redis_client, user_id)
+    cached = get_cached_user(redis_client, telegram_id)
     if cached:
         return {"servers": _normalize_servers(list(cached.get("servers") or []))}
 
-    lock = _user_assignment_lock(redis_client, user_id)
+    lock = _assignment_lock(redis_client, telegram_id)
     try:
         with lock:
-            cached = get_cached_user(redis_client, user_id)
+            cached = get_cached_user(redis_client, telegram_id)
             if cached:
                 return {"servers": _normalize_servers(list(cached.get("servers") or []))}
 
@@ -156,14 +132,19 @@ def get_servers(user_id: int = Query(..., ge=1), db: Session = Depends(get_db)) 
 
             apply_assign(redis_client, assigned, amount=0.25)
             next_update = time.time() + REFRESH_COOLDOWN_SEC
-            save_cached_user(redis_client, user_id, assigned, next_update)
-            logger.info("assign user_id=%s servers=%s", user_id, [s["id"] for s in assigned])
+            save_cached_user(redis_client, telegram_id, assigned, next_update)
+            logger.info(
+                "assign telegram_id=%s internal_user_id=%s servers=%s",
+                telegram_id,
+                user.id,
+                [s["id"] for s in assigned],
+            )
             return {"servers": _normalize_servers(assigned)}
     except LockError:
-        cached = get_cached_user(redis_client, user_id)
+        cached = get_cached_user(redis_client, telegram_id)
         if cached:
             return {"servers": _normalize_servers(list(cached.get("servers") or []))}
-        logger.warning("assign lock wait exceeded user_id=%s", user_id)
+        logger.warning("assign lock wait exceeded telegram_id=%s", telegram_id)
         raise HTTPException(
             status_code=503,
             detail="assignment_busy_retry",
@@ -171,19 +152,20 @@ def get_servers(user_id: int = Query(..., ge=1), db: Session = Depends(get_db)) 
         ) from None
 
 
-@router.post("/refresh")
+@router.post("/refresh", summary="Перевыбрать серверы (не чаще чем раз в cooldown)")
 def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     now_dt = datetime.now(timezone.utc)
-    user = _ensure_user(db, user_id=body.user_id)
+    user = _ensure_user(db, body.telegram_id)
     if not _has_access(user, now_dt):
         return {"error": "subscription_required"}
 
     redis_client = get_redis()
+    tid = body.telegram_id
 
-    lock = _user_assignment_lock(redis_client, body.user_id)
+    lock = _assignment_lock(redis_client, tid)
     try:
         with lock:
-            cached = get_cached_user(redis_client, body.user_id)
+            cached = get_cached_user(redis_client, tid)
             if not cached:
                 raise HTTPException(status_code=409, detail="assignment_not_found")
 
@@ -203,18 +185,70 @@ def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[st
                 raise HTTPException(status_code=503, detail=str(exc)) from exc
 
             apply_assign(redis_client, new_servers, amount=0.25)
-            save_cached_user(redis_client, body.user_id, new_servers, now_ts + REFRESH_COOLDOWN_SEC)
+            save_cached_user(redis_client, tid, new_servers, now_ts + REFRESH_COOLDOWN_SEC)
             logger.info(
-                "refresh user_id=%s old_servers=%s new_servers=%s",
-                body.user_id,
+                "refresh telegram_id=%s internal_user_id=%s old_servers=%s new_servers=%s",
+                tid,
+                user.id,
                 [s["id"] for s in old_servers],
                 [s["id"] for s in new_servers],
             )
             return {"servers": _normalize_servers(new_servers)}
     except LockError:
-        logger.warning("refresh lock wait exceeded user_id=%s", body.user_id)
+        logger.warning("refresh lock wait exceeded telegram_id=%s", tid)
         raise HTTPException(
             status_code=503,
             detail="assignment_busy_retry",
             headers=_busy_assignment_headers(),
         ) from None
+
+
+@router.get("/contract", summary="Контракт API для клиента (JSON)")
+def api_contract() -> dict[str, Any]:
+    return {
+        "identifier": "Клиент передаёт telegram_id (число из Telegram WebApp / Login). Совпадает с пользователем оплаты в Mini App.",
+        "endpoints": [
+            {
+                "method": "GET",
+                "path": "/servers",
+                "query": {"telegram_id": "integer, required"},
+                "responses": {
+                    "200": {
+                        "servers": "[{id, type: wifi|bypass, priority: 1..2}] — всегда 4 записи при успехе",
+                        "error": "subscription_required — нет триала и нет subscription_expires_at",
+                    },
+                    "503": {
+                        "detail": "assignment_busy_retry — не взяли лок вовремя; заголовки Retry-After / X-Retry-Jitter-*",
+                        "detail_alt": "текст ошибки выбора серверов (мало alive wifi/bypass)",
+                    },
+                },
+            },
+            {
+                "method": "POST",
+                "path": "/refresh",
+                "body": {"telegram_id": "integer"},
+                "responses": {
+                    "200": {"servers": "как в GET"},
+                    "400": "validation",
+                    "200_alt": "{ \"error\": \"subscription_required\" } при истечении триала и подписки",
+                    "409": "assignment_not_found — нет кэша user:kf:*, сначала GET /servers",
+                    "429": "rate_limited — раньше next_update",
+                    "503": "assignment_busy_retry или ошибка пула серверов",
+                },
+            },
+            {
+                "method": "POST",
+                "path": "/api/payments/create",
+                "headers": {"X-Telegram-Init-Data": "обязательно для Mini App"},
+                "note": "После оплаты ЮKassa шлёт webhook на /api/payments/webhook — продлевается users.subscription_expires_at",
+            },
+        ],
+        "payments_webhook_url_hint": "Настроить в ЮKassa: POST https://<host>/api/payments/webhook",
+        "env": {
+            "MINIMAL_PAYMENT_WEBHOOK": "1 — только продление users.subscription_expires_at и статус payment (без Xray/Subscription/cp)",
+            "REDIS_URL или EDGE_REDIS_URL": "Redis для балансировки",
+            "DATABASE_URL": "PostgreSQL",
+            "YOOKASSA_*": "магазин ЮKassa",
+        },
+        "redis_catalog": "servers:list JSON массив id; server:{id} hash: type, count, max, status, last_assigned, host — см. scripts/seed_redis_key_factory.py",
+    }

@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "redis>=5.0.0",
+    "yookassa>=3.0.0",
 ]
 
 [project.scripts]
