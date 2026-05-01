@@ -11,6 +11,8 @@ if config.config_file_name is not None:
 
 from db.base import Base
 from db.models import (  # noqa: F401
+    AccessKey,
+    AccessKeyDevice,
     CpServer,
     CpUser,
     Device,

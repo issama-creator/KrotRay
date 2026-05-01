@@ -2,8 +2,9 @@
 Key factory: 4 сервера из Redis.
 
 Идентификация (ровно один вариант):
-- Нативное приложение: platform + device_stable_id (ANDROID_ID / аналог + триал на устройство).
-- Mini App / уже только Telegram: telegram_id.
+- Нативное приложение, триал: platform + device_stable_id.
+- Нативное приложение, после оплаты: key + platform + device_stable_id (ключ из ЛК / Mini App).
+- Mini App / только Telegram: telegram_id.
 
 Redis-кэш назначения: user:kf:{users.id} (внутренний account_id).
 """
@@ -11,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +27,7 @@ from db.models.payment import Payment
 from db.models.subscription import Subscription
 from db.models.user import User
 from db.session import get_session
+from services.access_keys import access_key_max_devices, resolve_user_for_access_key_request
 from services.minimal_lb import (
     apply_assign,
     apply_deassign,
@@ -36,11 +38,11 @@ from services.minimal_lb import (
     pick_servers_dual,
     save_cached_user,
 )
+from services.vpn_access import user_has_vpn_access
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["key-factory"])
 
-TRIAL_DAYS = 3
 REFRESH_COOLDOWN_SEC = 5 * 60
 
 _ALLOWED_PLATFORMS = frozenset({"android", "ios"})
@@ -124,13 +126,50 @@ def _resolve_user_for_servers(
     return _ensure_user_device(db, platform=plat, device_stable_id=device_stable_id)
 
 
-def _has_access(user: User, now_dt: datetime) -> bool:
-    created_at = _to_utc(user.created_at) or now_dt
-    trial_until = created_at + timedelta(days=TRIAL_DAYS)
-    if now_dt < trial_until:
-        return True
-    sub_expires_at = _to_utc(user.subscription_expires_at)
-    return bool(sub_expires_at and sub_expires_at > now_dt)
+def _servers_identity_exclusive(
+    *,
+    key: str | None,
+    telegram_id: int | None,
+    platform: str | None,
+    device_stable_id: str | None,
+) -> None:
+    has_k = bool(key and key.strip())
+    has_tg = telegram_id is not None
+    has_dev = bool(platform and device_stable_id)
+    if sum([has_k, has_tg, has_dev]) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="provide exactly one of: key (with platform+device_stable_id), telegram_id, or (platform+device_stable_id)",
+        )
+    if has_k and (not platform or not device_stable_id):
+        raise HTTPException(status_code=400, detail="key requires platform and device_stable_id")
+
+
+def _resolve_servers_user(
+    db: Session,
+    *,
+    key: str | None,
+    telegram_id: int | None,
+    platform: str | None,
+    device_stable_id: str | None,
+) -> tuple[User | None, str | None]:
+    """(user, error). error: invalid_key | subscription_required | device_limit | None."""
+    if key and key.strip():
+        plat = (platform or "").strip().lower()
+        did = device_stable_id or ""
+        return resolve_user_for_access_key_request(
+            db,
+            token=key.strip(),
+            platform=plat,
+            device_stable_id=did,
+        )
+    user = _resolve_user_for_servers(
+        db,
+        telegram_id=telegram_id,
+        platform=platform,
+        device_stable_id=device_stable_id,
+    )
+    return user, None
 
 
 def _normalize_servers(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -147,16 +186,21 @@ def _normalize_servers(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class RefreshBody(BaseModel):
+    key: str | None = Field(default=None, max_length=64)
     telegram_id: int | None = Field(default=None, ge=1)
     platform: Literal["android", "ios"] | None = None
     device_stable_id: str | None = Field(default=None, max_length=128)
 
     @model_validator(mode="after")
     def _one_identity(self) -> RefreshBody:
+        has_k = bool(self.key and self.key.strip())
         has_tg = self.telegram_id is not None
         has_dev = bool(self.platform and self.device_stable_id)
-        if has_tg == has_dev:
-            raise ValueError("provide either telegram_id or (platform + device_stable_id)")
+        modes = sum([has_k, has_tg, has_dev])
+        if modes != 1:
+            raise ValueError("provide exactly one of: key, telegram_id, or (platform + device_stable_id)")
+        if has_k and (not self.platform or not self.device_stable_id):
+            raise ValueError("key requires platform and device_stable_id")
         return self
 
 
@@ -180,14 +224,36 @@ def _payload_servers_ok(user: User, servers_norm: list[dict[str, Any]]) -> dict[
 
 @router.get("/servers", summary="Четвёрка серверов (trial / подписка)")
 def get_servers(
+    key: str | None = Query(None, max_length=64, description="Ключ из ЛК после оплаты; вместе с platform+device_stable_id"),
     telegram_id: int | None = Query(None, ge=1),
     platform: str | None = Query(None, description="android | ios"),
     device_stable_id: str | None = Query(None, max_length=128),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     now_dt = datetime.now(timezone.utc)
-    user = _resolve_user_for_servers(db, telegram_id=telegram_id, platform=platform, device_stable_id=device_stable_id)
-    if not _has_access(user, now_dt):
+    _servers_identity_exclusive(
+        key=key,
+        telegram_id=telegram_id,
+        platform=platform,
+        device_stable_id=device_stable_id,
+    )
+    user, pre_err = _resolve_servers_user(
+        db,
+        key=key,
+        telegram_id=telegram_id,
+        platform=platform,
+        device_stable_id=device_stable_id,
+    )
+    if pre_err == "invalid_key":
+        return {"account_id": None, "error": "invalid_key"}
+    if pre_err == "subscription_required":
+        assert user is not None
+        return {"account_id": user.id, "error": "subscription_required"}
+    if pre_err == "device_limit":
+        assert user is not None
+        return {"account_id": user.id, "error": "device_limit"}
+    assert user is not None
+    if not user_has_vpn_access(user, now_dt, db):
         return {"account_id": user.id, "error": "subscription_required"}
 
     redis_client = get_redis()
@@ -229,13 +295,23 @@ def get_servers(
 @router.post("/refresh", summary="Перевыбор серверов (cooldown)")
 def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     now_dt = datetime.now(timezone.utc)
-    user = _resolve_user_for_servers(
+    user, pre_err = _resolve_servers_user(
         db,
+        key=body.key,
         telegram_id=body.telegram_id,
         platform=body.platform,
         device_stable_id=body.device_stable_id,
     )
-    if not _has_access(user, now_dt):
+    if pre_err == "invalid_key":
+        return {"account_id": None, "error": "invalid_key"}
+    if pre_err == "subscription_required":
+        assert user is not None
+        return {"account_id": user.id, "error": "subscription_required"}
+    if pre_err == "device_limit":
+        assert user is not None
+        return {"account_id": user.id, "error": "device_limit"}
+    assert user is not None
+    if not user_has_vpn_access(user, now_dt, db):
         return {"account_id": user.id, "error": "subscription_required"}
 
     redis_client = get_redis()
@@ -325,7 +401,6 @@ def attach_telegram(body: AttachBody, db: Session = Depends(get_db)) -> dict[str
         tg_user.subscription_expires_at = max(sub_d, sub_t)
     elif sub_d:
         tg_user.subscription_expires_at = dev_user.subscription_expires_at
-    # else keep tg subscription
 
     tg_user.platform = body.platform
     tg_user.device_stable_id = did
@@ -351,22 +426,40 @@ def attach_telegram(body: AttachBody, db: Session = Depends(get_db)) -> dict[str
 @router.get("/contract", summary="Контракт API (JSON)")
 def api_contract() -> dict[str, Any]:
     return {
+        "model": {
+            "idea": "Идентификация запроса ≠ источник оплаты: триал по паре platform+device_stable_id; платный доступ по access key (выдан после оплаты в Telegram / Mini App).",
+            "device_stable_id": "Стабильный ID устройства (Android: часто ANDROID_ID; iOS: например identifierForVendor в Keychain). Не путать с query-параметром device_id — в API только device_stable_id.",
+            "telegram": "Mini App: оплата и выдача app_access_key в GET /api/me; сам telegram_id в клиенте для GET /servers не обязателен, если пользователь вводит ключ.",
+        },
         "identity_modes": [
-            "Нативное приложение: GET /servers?platform=android|ios&device_stable_id=... (триал на пару platform+device)",
+            "Триал (без Telegram): GET /servers?platform=android|ios&device_stable_id=...",
+            "Платный доступ (ключ): GET /servers?key=<token>&platform=...&device_stable_id=... — первое успешное обращение регистрирует устройство в access_key_devices (лимит ACCESS_KEY_MAX_DEVICES).",
             "Mini App / только Telegram: GET /servers?telegram_id=...",
-            "Не смешивать параметры в одном запросе.",
+            "Ровно один режим за запрос.",
         ],
+        "client_notes": [
+            "После перехода с триала на ключ account_id в ответе меняется (Redis user:kf привязан к оплатившему users.id): сбросьте локальный кэш серверов и конфигов.",
+            "После первой успешной выдачи с ключом имеет смысл POST /refresh с тем же key+platform+device_stable_id если хотите гарантированно пересобрать четвёрку (иначе остаётся закэшированное назначение для этого account_id).",
+        ],
+        "access_key_max_devices": access_key_max_devices(),
         "responses": {
             "success_includes": {"account_id": "внутренний users.id (поддержка, логи)", "servers": "4 объекта"},
             "subscription_required": '{"account_id", "error":"subscription_required"}',
+            "invalid_key": '{"account_id": null, "error":"invalid_key"}',
+            "device_limit": '{"account_id", "error":"device_limit"} — смягчённый лимит «слотов» устройств на один ключ.',
+        },
+        "refresh": {
+            "method": "POST",
+            "path": "/refresh",
+            "body_modes": "ровно как GET /servers: key+platform+device_stable_id ИЛИ telegram_id ИЛИ platform+device_stable_id (без ключа, триал).",
         },
         "attach": {
             "method": "POST",
             "path": "/attach",
             "body": {"platform": "android|ios", "device_stable_id": "str", "telegram_id": "int"},
-            "note": "Вызывать после того как пользователь открыл бота / выдал telegram_id. merge=True если сливали с аккаунтом Mini App.",
+            "note": "Опционально / для миграций: слить строку «только устройство» с аккаунтом Telegram в БД. Основной поток после оплаты — ключ (GET /servers?key=...), attach для доступа не обязателен.",
         },
-        "redis_user_key": "user:kf:{account_id}",
-        "payments": "POST /api/payments/create + webhook — продлевает subscription_expires_at по users.id",
+        "redis_user_key": "user:kf:{account_id} — балансировка не зависит от типа идентификации в запросе.",
+        "payments": "POST /api/payments/create + webhook — продлевает subscription_expires_at и создаёт/обновляет access_keys.",
         "redis_catalog": "scripts/seed_redis_key_factory.py",
     }

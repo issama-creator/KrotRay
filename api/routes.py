@@ -12,6 +12,7 @@ from api.auth import get_or_create_user, verify_init_data
 from bot.config import VLESS_URL_TEMPLATE
 from db.models import Payment, Server, Subscription, User
 from db.session import get_session
+from services.access_keys import get_or_create_access_key_token
 
 
 def build_vless_url(uuid: str | None, server: Server | None = None) -> str | None:
@@ -143,6 +144,10 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
     else:
         response["subscription"] = None
         response["state"] = "no_subscription"
+
+    app_key = get_or_create_access_key_token(db, user.id)
+    if app_key:
+        response["app_access_key"] = app_key
 
     return response
 

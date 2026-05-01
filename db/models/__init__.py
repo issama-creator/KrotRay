@@ -1,3 +1,4 @@
+from db.models.access_key import AccessKey, AccessKeyDevice
 from db.models.cp_server import CpServer
 from db.models.cp_user import CpUser
 from db.models.device import Device
@@ -9,6 +10,8 @@ from db.models.subscription import Subscription
 from db.models.user import User
 
 __all__ = [
+    "AccessKey",
+    "AccessKeyDevice",
     "User",
     "Subscription",
     "Server",

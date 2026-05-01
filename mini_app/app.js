@@ -98,6 +98,10 @@
       if (statusPillText) statusPillText.textContent = "Загрузка…";
       if (statusPill) statusPill.className = "status-card status_card_loading";
       if (keyInput) keyInput.value = "";
+      var appKeySectionL = document.getElementById("app-key-section");
+      var appKeyInputL = document.getElementById("app-access-key-input");
+      if (appKeySectionL) appKeySectionL.hidden = true;
+      if (appKeyInputL) appKeyInputL.value = "";
       return;
     }
 
@@ -105,6 +109,10 @@
       if (statusPillText) statusPillText.textContent = "Ошибка загрузки";
       if (statusPill) statusPill.className = "status-card status_card_error";
       if (keyInput) keyInput.value = "";
+      var appKeySectionE = document.getElementById("app-key-section");
+      var appKeyInputE = document.getElementById("app-access-key-input");
+      if (appKeySectionE) appKeySectionE.hidden = true;
+      if (appKeyInputE) appKeyInputE.value = "";
       setBuyButtonLabel("Получить ключ");
       return;
     }
@@ -131,6 +139,18 @@
       if (statusPill) statusPill.className = "status-card";
       if (keyInput) keyInput.value = "";
       setBuyButtonLabel("Получить ключ");
+    }
+
+    var appKeySection = document.getElementById("app-key-section");
+    var appKeyInput = document.getElementById("app-access-key-input");
+    if (appKeySection && appKeyInput) {
+      if (data.app_access_key) {
+        appKeySection.hidden = false;
+        appKeyInput.value = data.app_access_key;
+      } else {
+        appKeySection.hidden = true;
+        appKeyInput.value = "";
+      }
     }
   }
 
@@ -362,6 +382,24 @@
       el._toastTimer = setTimeout(function () {
         el.classList.remove("toast_visible");
       }, 2500);
+    }
+
+    var btnCopyAppKey = document.getElementById("btn-copy-app-key");
+    if (btnCopyAppKey) {
+      btnCopyAppKey.onclick = function () {
+        var input = document.getElementById("app-access-key-input");
+        if (!input || !input.value.trim()) {
+          tg.showAlert && tg.showAlert("Ключ приложения ещё не доступен");
+          return;
+        }
+        tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+        try {
+          navigator.clipboard.writeText(input.value);
+          showToast("Ключ скопирован");
+        } catch (e) {
+          tg.showAlert && tg.showAlert("Скопируйте вручную");
+        }
+      };
     }
 
     if (btnCopy) {

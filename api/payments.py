@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from api.auth import get_or_create_user, verify_init_data
 from api.minimal_subscription import bump_subscription_expires_at
+from services.access_keys import ensure_access_key_after_payment
 from api.cp_subscription_sync import sync_cp_after_payment_success
 from api.server import get_least_loaded_server
 from api.xray_grpc import add_user_to_xray
@@ -245,6 +246,9 @@ def webhook(request: dict, db: Session = Depends(get_db)):
         db.commit()
 
         bump_subscription_expires_at(db, user_id=payment.user_id, tariff_months=payment.tariff_months)
+        db.commit()
+
+        ensure_access_key_after_payment(db, payment.user_id)
         db.commit()
 
         if MINIMAL_PAYMENT_WEBHOOK:
