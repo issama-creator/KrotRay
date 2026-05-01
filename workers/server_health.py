@@ -1,3 +1,4 @@
+"""Periodically mark Redis server:{id} status alive/dead via TCP."""
 from __future__ import annotations
 
 import logging
@@ -6,7 +7,6 @@ import os
 from services.minimal_lb import get_redis, load_server_ids, tcp_healthcheck
 
 logger = logging.getLogger(__name__)
-
 
 HEALTH_PORT = int(os.getenv("HEALTH_CHECK_PORT", "443"))
 HEALTH_TIMEOUT_SEC = float(os.getenv("HEALTH_CHECK_TIMEOUT_SEC", "1.5"))

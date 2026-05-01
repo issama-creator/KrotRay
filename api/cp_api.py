@@ -73,13 +73,6 @@ class AttachBody(BaseModel):
     telegram_id: int
 
 
-class VpnHeartbeatBody(BaseModel):
-    """Пинг с клиента: пока VPN включён — раз в 3–4 мин; connected=false при явном отключении."""
-
-    device_id: str = Field(..., min_length=1)
-    connected: bool = True
-
-
 def _parse_uuid(s: str) -> uuid.UUID:
     try:
         return uuid.UUID(s.strip())
@@ -355,31 +348,6 @@ def get_config(
         raise HTTPException(status_code=500, detail="config error") from None
 
     return cfg
-
-
-@router.post("/vpn-heartbeat")
-def vpn_heartbeat(body: VpnHeartbeatBody, db: Session = Depends(get_db)) -> dict:
-    """Flutter: при активном туннеле вызывать каждые 3–4 мин; connected=false — сброс метки в БД."""
-    did_s = str(_parse_uuid(body.device_id))
-    device = db.scalar(
-        select(Device).options(joinedload(Device.user)).where(Device.device_id == did_s),
-    )
-    if not device:
-        raise HTTPException(status_code=404, detail="device not found")
-    now = datetime.now(timezone.utc)
-    if effective_subscription_until(device) < now:
-        raise HTTPException(status_code=403, detail="subscription expired")
-    if body.connected:
-        device.tunnel_last_seen_at = now
-    else:
-        device.tunnel_last_seen_at = None
-    db.commit()
-    return {
-        "ok": True,
-        "tunnel_last_seen_at": device.tunnel_last_seen_at.isoformat()
-        if device.tunnel_last_seen_at
-        else None,
-    }
 
 
 @router.get("/subscription")

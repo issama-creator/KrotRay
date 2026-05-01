@@ -1,4 +1,4 @@
-"""Dedicated health-check worker for key factory."""
+"""Single-purpose worker: TCP health checks for Redis server catalog."""
 from __future__ import annotations
 
 import logging
@@ -12,6 +12,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(name)s: %(messa
 logger = logging.getLogger(__name__)
 
 _STOP = False
+
 HEALTH_INTERVAL_SEC = int(os.getenv("HEALTH_CHECK_INTERVAL_SEC", "45"))
 
 
@@ -26,7 +27,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_stop)
 
     sleep_sec = min(60, max(30, HEALTH_INTERVAL_SEC))
-    logger.info("workers_main: health-check worker started interval=%s", sleep_sec)
+    logger.info("workers_main: health-check only interval=%ss", sleep_sec)
 
     try:
         while not _STOP:
@@ -45,4 +46,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
