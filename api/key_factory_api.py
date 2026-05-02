@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, model_validator
 from redis import Redis
 from redis.exceptions import LockError
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.auth import get_or_create_user
@@ -97,7 +98,16 @@ def _ensure_user_device(db: Session, *, platform: str, device_stable_id: str) ->
         first_name=None,
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        user = db.scalar(
+            select(User).where(User.platform == platform, User.device_stable_id == did),
+        )
+        if user is not None:
+            return user
+        raise
     db.refresh(user)
     logger.info("key_factory: new device user id=%s platform=%s", user.id, platform)
     return user
@@ -176,11 +186,21 @@ def _resolve_servers_user(
 def _normalize_servers(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for item in items:
+        praw = item.get("priority", 0)
+        if praw is None:
+            prio = 0
+        else:
+            try:
+                prio = int(praw)
+            except (TypeError, ValueError):
+                prio = 0
+        sid = item.get("id")
+        stype = item.get("type")
         out.append(
             {
-                "id": str(item.get("id")),
-                "type": str(item.get("type")),
-                "priority": int(item.get("priority", 0)),
+                "id": "" if sid is None else str(sid),
+                "type": "" if stype is None else str(stype),
+                "priority": prio,
             }
         )
     return out
