@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision: str = "021"
@@ -19,21 +20,29 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "subscriptions",
-        sa.Column("allowed_devices", sa.Integer(), nullable=False, server_default="1"),
-    )
-    op.add_column(
-        "subscriptions",
-        sa.Column("disabled_by_limit", sa.Boolean(), nullable=False, server_default=sa.false()),
-    )
-    op.add_column(
-        "subscriptions",
-        sa.Column("violation_count", sa.Integer(), nullable=False, server_default="0"),
-    )
+    """Колонки могли быть добавлены вручную до этой ревизии — не дублируем."""
+    conn = op.get_bind()
+    existing = {c["name"] for c in inspect(conn).get_columns("subscriptions")}
+    if "allowed_devices" not in existing:
+        op.add_column(
+            "subscriptions",
+            sa.Column("allowed_devices", sa.Integer(), nullable=False, server_default="1"),
+        )
+    if "disabled_by_limit" not in existing:
+        op.add_column(
+            "subscriptions",
+            sa.Column("disabled_by_limit", sa.Boolean(), nullable=False, server_default=sa.false()),
+        )
+    if "violation_count" not in existing:
+        op.add_column(
+            "subscriptions",
+            sa.Column("violation_count", sa.Integer(), nullable=False, server_default="0"),
+        )
 
 
 def downgrade() -> None:
-    op.drop_column("subscriptions", "violation_count")
-    op.drop_column("subscriptions", "disabled_by_limit")
-    op.drop_column("subscriptions", "allowed_devices")
+    conn = op.get_bind()
+    existing = {c["name"] for c in inspect(conn).get_columns("subscriptions")}
+    for name in ("violation_count", "disabled_by_limit", "allowed_devices"):
+        if name in existing:
+            op.drop_column("subscriptions", name)
