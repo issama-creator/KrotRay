@@ -58,6 +58,16 @@ def _busy_assignment_headers() -> dict[str, str]:
     }
 
 
+def _rate_limited_headers(wait_sec: int) -> dict[str, str]:
+    # Подсказки для клиента: не спамить refresh и делать backoff с джиттером.
+    safe_wait = max(1, int(wait_sec))
+    return {
+        "Retry-After": str(safe_wait),
+        "X-Retry-Jitter-Ms-Min": "100",
+        "X-Retry-Jitter-Ms-Max": "300",
+    }
+
+
 def _assignment_lock(redis_client: Redis, account_id: int):
     return redis_client.lock(
         f"lock:kf:acct:{account_id}",
@@ -385,7 +395,12 @@ def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[st
             now_ts = time.time()
             next_update = float(cached.get("next_update") or 0.0)
             if now_ts < next_update:
-                raise HTTPException(status_code=429, detail="rate_limited")
+                wait_sec = int(next_update - now_ts)
+                raise HTTPException(
+                    status_code=429,
+                    detail="rate_limited",
+                    headers=_rate_limited_headers(wait_sec),
+                )
 
             old_servers = _normalize_servers(_assignment_items_from_cache(cached.get("servers")))
             apply_deassign(redis_client, old_servers, amount=0.25)
@@ -509,6 +524,7 @@ def api_contract() -> dict[str, Any]:
             "subscription_required": '{"account_id", "error":"subscription_required"}',
             "invalid_key": '{"account_id": null, "error":"invalid_key"}',
             "device_limit": '{"account_id", "error":"device_limit"} — смягчённый лимит «слотов» устройств на один ключ.',
+            "rate_limited": 'HTTP 429 {"detail":"rate_limited"} + Retry-After',
         },
         "refresh": {
             "method": "POST",
@@ -525,4 +541,5 @@ def api_contract() -> dict[str, Any]:
         "redis_user_key": "user:kf:{account_id} — балансировка не зависит от типа идентификации в запросе.",
         "payments": "POST /api/payments/create + webhook — продлевает subscription_expires_at и создаёт/обновляет access_keys.",
         "redis_catalog": "scripts/seed_redis_key_factory.py",
+        "client_backoff": "Для 429/503 используйте экспоненциальный backoff (например 2s, 5s, 15s) и учитывайте Retry-After.",
     }
