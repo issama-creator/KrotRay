@@ -37,6 +37,7 @@ from services.minimal_lb import (
     load_all_servers,
     pick_servers_dual,
     save_cached_user,
+    wifi_bypass_ids_from_assignment,
 )
 from services.vpn_access import user_has_vpn_access
 
@@ -278,7 +279,13 @@ def get_servers(
             apply_assign(redis_client, assigned, amount=0.25)
             next_update = time.time() + REFRESH_COOLDOWN_SEC
             save_cached_user(redis_client, aid, assigned, next_update)
-            logger.info("assign account_id=%s servers=%s", aid, [s["id"] for s in assigned])
+            w_ids, b_ids = wifi_bypass_ids_from_assignment(assigned)
+            logger.info(
+                "kf_assign user_id=%s wifi_ids=%s bypass_ids=%s",
+                aid,
+                w_ids,
+                b_ids,
+            )
             return _payload_servers_ok(user, _normalize_servers(assigned))
     except LockError:
         cached = get_cached_user(redis_client, aid)
@@ -341,11 +348,15 @@ def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[st
 
             apply_assign(redis_client, new_servers, amount=0.25)
             save_cached_user(redis_client, aid, new_servers, now_ts + REFRESH_COOLDOWN_SEC)
+            old_w, old_b = wifi_bypass_ids_from_assignment(old_servers)
+            new_w, new_b = wifi_bypass_ids_from_assignment(new_servers)
             logger.info(
-                "refresh account_id=%s old=%s new=%s",
+                "kf_refresh user_id=%s old_wifi_ids=%s old_bypass_ids=%s new_wifi_ids=%s new_bypass_ids=%s",
                 aid,
-                [s["id"] for s in old_servers],
-                [s["id"] for s in new_servers],
+                old_w,
+                old_b,
+                new_w,
+                new_b,
             )
             return _payload_servers_ok(user, _normalize_servers(new_servers))
     except LockError:
@@ -459,6 +470,7 @@ def api_contract() -> dict[str, Any]:
             "body": {"platform": "android|ios", "device_stable_id": "str", "telegram_id": "int"},
             "note": "Опционально / для миграций: слить строку «только устройство» с аккаунтом Telegram в БД. Основной поток после оплаты — ключ (GET /servers?key=...), attach для доступа не обязателен.",
         },
+        "assignment": "Ровно 2 сервера type=wifi и 2 type=bypass; пулы выбираются независимо (pick_from_group ×2). Связка конкретных RU↔EU только на стороне эксплуатации, не в Redis.",
         "redis_user_key": "user:kf:{account_id} — балансировка не зависит от типа идентификации в запросе.",
         "payments": "POST /api/payments/create + webhook — продлевает subscription_expires_at и создаёт/обновляет access_keys.",
         "redis_catalog": "scripts/seed_redis_key_factory.py",

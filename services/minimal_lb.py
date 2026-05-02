@@ -214,7 +214,26 @@ def pick_from_group(servers: list[RuntimeServer], k: int = 2) -> list[dict[str, 
     return last
 
 
+def wifi_bypass_ids_from_assignment(assigned: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+    """Разбивает уже выбранную четвёрку на списки id по типу (для логов)."""
+    wifi_ids: list[str] = []
+    bypass_ids: list[str] = []
+    for item in assigned:
+        sid = str(item.get("id", ""))
+        t = str(item.get("type", "")).strip().lower()
+        if t == "wifi":
+            wifi_ids.append(sid)
+        elif t == "bypass":
+            bypass_ids.append(sid)
+    return wifi_ids, bypass_ids
+
+
 def pick_servers_dual(servers: list[RuntimeServer]) -> list[dict[str, Any]]:
+    """
+    Один тариф: ровно 2 сервера type=wifi и 2 type=bypass.
+    Пулы не смешиваются; связка RU→EU только операционная (не в Redis и не в этом коде).
+    Вес и pick_from_group — без изменений.
+    """
     wifi = [s for s in servers if s.server_type == "wifi"]
     bypass = [s for s in servers if s.server_type == "bypass"]
     alive_wifi_n = sum(1 for s in wifi if s.status == "alive")

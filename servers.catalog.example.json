@@ -1,0 +1,36 @@
+[
+  {
+    "name": "EU WiFi 1",
+    "host": "10.0.0.10",
+    "grpc_port": 8080,
+    "type": "wifi",
+    "region": "eu",
+    "max_users": 180
+  },
+  {
+    "name": "EU WiFi 2",
+    "host": "10.0.0.11",
+    "grpc_port": 8080,
+    "type": "wifi",
+    "region": "eu",
+    "max_users": 180
+  },
+  {
+    "name": "RU Bypass 1",
+    "host": "10.0.0.20",
+    "grpc_port": 8080,
+    "type": "bypass",
+    "region": "ru",
+    "link_to_host": "10.0.0.10",
+    "max_users": 180
+  },
+  {
+    "name": "RU Bypass 2",
+    "host": "10.0.0.21",
+    "grpc_port": 8080,
+    "type": "bypass",
+    "region": "ru",
+    "link_to_host": "10.0.0.11",
+    "max_users": 180
+  }
+]

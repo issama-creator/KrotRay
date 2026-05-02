@@ -14,6 +14,9 @@
 
 Поля hash server:{id}: type, max, count (0), status (alive), last_assigned (0), host.
 Также пишет servers:list как JSON массив id (порядок сохраняется).
+
+Если каталог ведёте в Postgres (servers.kf_type wifi|bypass), используйте вместо этого:
+  python scripts/init_redis_servers.py
 """
 from __future__ import annotations
 
