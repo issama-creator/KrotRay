@@ -1,16 +1,23 @@
 """
-Залить каталог key-factory из Postgres в Redis (runtime для minimal_lb).
+Каталог key-factory: Postgres (источник правды) → Redis (runtime для minimal_lb).
 
-Условие попадания в Redis: servers.kf_type IN ('wifi','bypass') AND servers.enabled.
+Условие строки в синке:
+  servers.enabled = true  AND  servers.kf_type IN ('wifi','bypass')
 
-Redis ключ ноды: server:<postgres_servers.id> — id совпадает с PK в БД.
-Поля hash (без изменения контракта балансировщика): type, host, max, count, status, last_assigned.
+В Redis только контракт балансировщика (без region, linked_server_id, plan и т.д.):
+  servers:list          → JSON-массив id (строки, совпадают с servers.id в Postgres)
+  server:{id}           → hash: type, host, max, count, status, last_assigned
 
-Связка RU→EU (linked_server_id) хранится только в Postgres; в Redis не дублируется.
+Перед записью полностью очищаются старый servers:list и все ключи server:*.
 
-Пример:
+Использование:
   python scripts/init_redis_servers.py
   python scripts/init_redis_servers.py --dry-run
+
+Сопоставление полей Postgres ↔ промпт / Redis:
+  kf_type      → redis hash field ``type`` (wifi | bypass)
+  enabled      → фильтр ``is_active`` из ТЗ (в БД колонка ``enabled``)
+  host + grpc_port → одно поле ``host`` в Redis (если host уже содержит ':', не дописываем порт)
 """
 from __future__ import annotations
 
@@ -23,11 +30,31 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 
+# Фиксированный потолок слотов в Redis для LB (не храним count в Postgres).
+REDIS_MAX_DEFAULT = 180
+
+
+def _redis_runtime_host(host: str, grpc_port: int, server_id: int) -> str:
+    base = (host or "").strip()
+    if not base:
+        return str(server_id)
+    if ":" in base:
+        return base
+    return f"{base}:{int(grpc_port)}"
+
+
+def _flush_redis_catalog(r) -> None:
+    """Удалить servers:list и все server:*."""
+    keys = list(r.scan_iter(match="server:*"))
+    if keys:
+        r.delete(*keys)
+    r.delete("servers:list")
+
 
 def main() -> int:
     load_dotenv()
-    p = argparse.ArgumentParser(description="Postgres servers → Redis key-factory catalog")
-    p.add_argument("--dry-run", action="store_true", help="Только печать, без записи в Redis")
+    p = argparse.ArgumentParser(description="Postgres servers → Redis key-factory catalog (полная перезапись)")
+    p.add_argument("--dry-run", action="store_true", help="Только печать плана, без Redis")
     args = p.parse_args()
 
     redis_url = (
@@ -52,7 +79,7 @@ def main() -> int:
             select(Server)
             .where(Server.kf_type.in_(["wifi", "bypass"]))
             .where(Server.enabled.is_(True))
-            .order_by(Server.id)
+            .order_by(Server.id),
         ).all()
     finally:
         db.close()
@@ -60,7 +87,7 @@ def main() -> int:
     if not rows:
         print(
             "Нет строк с kf_type wifi|bypass и enabled=true. "
-            "Добавьте серверы в Postgres или выполните scripts/import_servers_catalog_json.py",
+            "Заполни каталог в Postgres (поля kf_type, host, enabled; опционально region, linked_server_id).",
             file=sys.stderr,
         )
         return 2
@@ -72,27 +99,32 @@ def main() -> int:
         ktype = (s.kf_type or "").strip().lower()
         mapping = {
             "type": ktype,
-            "host": s.host.strip(),
-            "max": str(max(1, int(s.max_users or 100))),
+            "host": _redis_runtime_host(s.host, s.grpc_port, s.id),
+            "max": str(REDIS_MAX_DEFAULT),
             "count": "0",
             "status": "alive",
             "last_assigned": "0",
         }
         payloads.append((sid, mapping))
 
-    print(f"Будет записано серверов: {len(ids)} redis_url={redis_url!r}")
+    print(f"Запись каталога: {len(ids)} сервер(ов), redis_url={redis_url!r}")
     for sid, m in payloads:
         print(f"  server:{sid} type={m['type']} host={m['host']} max={m['max']}")
 
     if args.dry_run:
-        print("(dry-run, Redis не трогаем)")
+        print("(dry-run: очистка Redis и запись не выполняются)")
         return 0
 
     r = redis.Redis.from_url(redis_url, decode_responses=True)
+    _flush_redis_catalog(r)
+
+    pipe = r.pipeline(transaction=True)
     for sid, mapping in payloads:
-        r.hset(f"server:{sid}", mapping=mapping)
-    r.set("servers:list", json.dumps(ids, separators=(",", ":")))
-    print("OK: servers:list и server:{id} обновлены, count сброшен в 0.")
+        pipe.hset(f"server:{sid}", mapping=mapping)
+    pipe.set("servers:list", json.dumps(ids, separators=(",", ":")))
+    pipe.execute()
+
+    print("OK: Redis очищен и заново заполнен (servers:list + server:{id}, count=0, max=180).")
     return 0
 
 

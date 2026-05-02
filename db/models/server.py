@@ -7,7 +7,16 @@ from db.base import Base
 
 
 class Server(Base):
-    """Сервер Xray + опционально строка в каталоге key-factory (Redis runtime)."""
+    """
+    Сервер Xray + каталог для key-factory.
+
+    Postgres — источник правды для состава пула (управление через БД).
+    Redis runtime поднимается скриптом ``scripts/init_redis_servers.py`` (не читать эту таблицу в GET /servers).
+
+    Каталог в Redis: строки с ``kf_type IN ('wifi','bypass')`` и ``enabled=True``;
+    поле ``kf_type`` попадает в Redis как ``type``. Колонки ``region``, ``linked_server_id``, ``plan``
+    в Redis не синкаются.
+    """
 
     __tablename__ = "servers"
 
