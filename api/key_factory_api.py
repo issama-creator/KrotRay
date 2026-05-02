@@ -18,7 +18,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from redis import Redis
-from redis.exceptions import LockError
+from redis.exceptions import LockError, RedisError
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -186,6 +186,15 @@ def _resolve_servers_user(
     return user, None
 
 
+def _assignment_items_from_cache(raw: Any) -> list[dict[str, Any]]:
+    """Из Redis user:kf:* поле servers должно быть list[dict]; иначе не падаем на item.get."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return []
+    return [x for x in raw if isinstance(x, dict)]
+
+
 def _normalize_servers(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for item in items:
@@ -282,44 +291,57 @@ def get_servers(
 
     redis_client = get_redis()
     aid = user.id
-    cached = get_cached_user(redis_client, aid)
-    if cached:
-        return _payload_servers_ok(user, _normalize_servers(list(cached.get("servers") or [])))
-
-    lock = _assignment_lock(redis_client, aid)
     try:
-        with lock:
-            cached = get_cached_user(redis_client, aid)
-            if cached:
-                return _payload_servers_ok(user, _normalize_servers(list(cached.get("servers") or [])))
-
-            all_servers = load_all_servers(redis_client)
-            try:
-                assigned = pick_servers_dual(all_servers)
-            except ValueError as exc:
-                raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-            apply_assign(redis_client, assigned, amount=0.25)
-            next_update = time.time() + REFRESH_COOLDOWN_SEC
-            save_cached_user(redis_client, aid, assigned, next_update)
-            w_ids, b_ids = wifi_bypass_ids_from_assignment(assigned)
-            logger.info(
-                "kf_assign user_id=%s wifi_ids=%s bypass_ids=%s",
-                aid,
-                w_ids,
-                b_ids,
-            )
-            return _payload_servers_ok(user, _normalize_servers(assigned))
-    except LockError:
         cached = get_cached_user(redis_client, aid)
         if cached:
-            return _payload_servers_ok(user, _normalize_servers(list(cached.get("servers") or [])))
-        logger.warning("assign lock wait exceeded account_id=%s", aid)
-        raise HTTPException(
-            status_code=503,
-            detail="assignment_busy_retry",
-            headers=_busy_assignment_headers(),
-        ) from None
+            return _payload_servers_ok(
+                user,
+                _normalize_servers(_assignment_items_from_cache(cached.get("servers"))),
+            )
+
+        lock = _assignment_lock(redis_client, aid)
+        try:
+            with lock:
+                cached = get_cached_user(redis_client, aid)
+                if cached:
+                    return _payload_servers_ok(
+                        user,
+                        _normalize_servers(_assignment_items_from_cache(cached.get("servers"))),
+                    )
+
+                all_servers = load_all_servers(redis_client)
+                try:
+                    assigned = pick_servers_dual(all_servers)
+                except ValueError as exc:
+                    raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+                apply_assign(redis_client, assigned, amount=0.25)
+                next_update = time.time() + REFRESH_COOLDOWN_SEC
+                save_cached_user(redis_client, aid, assigned, next_update)
+                w_ids, b_ids = wifi_bypass_ids_from_assignment(assigned)
+                logger.info(
+                    "kf_assign user_id=%s wifi_ids=%s bypass_ids=%s",
+                    aid,
+                    w_ids,
+                    b_ids,
+                )
+                return _payload_servers_ok(user, _normalize_servers(assigned))
+        except LockError:
+            cached = get_cached_user(redis_client, aid)
+            if cached:
+                return _payload_servers_ok(
+                    user,
+                    _normalize_servers(_assignment_items_from_cache(cached.get("servers"))),
+                )
+            logger.warning("assign lock wait exceeded account_id=%s", aid)
+            raise HTTPException(
+                status_code=503,
+                detail="assignment_busy_retry",
+                headers=_busy_assignment_headers(),
+            ) from None
+    except RedisError as exc:
+        logger.exception("redis error in get_servers account_id=%s", aid)
+        raise HTTPException(status_code=503, detail="redis_unavailable") from exc
 
 
 @router.post("/refresh", summary="Перевыбор серверов (cooldown)")
@@ -359,7 +381,7 @@ def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[st
             if now_ts < next_update:
                 raise HTTPException(status_code=429, detail="rate_limited")
 
-            old_servers = _normalize_servers(list(cached.get("servers") or []))
+            old_servers = _normalize_servers(_assignment_items_from_cache(cached.get("servers")))
             apply_deassign(redis_client, old_servers, amount=0.25)
 
             all_servers = load_all_servers(redis_client)
