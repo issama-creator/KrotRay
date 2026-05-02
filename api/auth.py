@@ -78,11 +78,14 @@ def get_or_create_user(session: Session, telegram_id: int, username: str | None,
             session.commit()
         return user
 
+    now = datetime.now(timezone.utc)
     user = User(
         telegram_id=telegram_id,
         username=username,
         first_name=first_name,
-        telegram_linked_at=datetime.now(timezone.utc),
+        telegram_linked_at=now,
+        created_at=now,
+        updated_at=now,
     )
     session.add(user)
     session.commit()

@@ -90,12 +90,15 @@ def _ensure_user_device(db: Session, *, platform: str, device_stable_id: str) ->
     )
     if user:
         return user
+    now = datetime.now(timezone.utc)
     user = User(
         telegram_id=None,
         platform=platform,
         device_stable_id=did,
         username=None,
         first_name=None,
+        created_at=now,
+        updated_at=now,
     )
     db.add(user)
     try:

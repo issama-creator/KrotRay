@@ -38,7 +38,7 @@ class User(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        insert_default=_utc_now,
+        default=_utc_now,
         comment="Регистрация строки; начало окна триала key-factory",
     )
     updated_at: Mapped[datetime] = mapped_column(
@@ -46,7 +46,7 @@ class User(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
-        insert_default=_utc_now,
+        default=_utc_now,
         comment="Последнее изменение записи",
     )
     telegram_linked_at: Mapped[datetime | None] = mapped_column(
