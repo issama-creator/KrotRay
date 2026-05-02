@@ -149,13 +149,16 @@ def _servers_identity_exclusive(
 ) -> None:
     has_k = bool(key and key.strip())
     has_tg = telegram_id is not None
-    has_dev = bool(platform and device_stable_id)
-    if sum([has_k, has_tg, has_dev]) != 1:
+    has_dev_pair = bool(platform and device_stable_id)
+    key_mode = has_k
+    tg_mode = has_tg
+    trial_mode = has_dev_pair and not has_k
+    if sum([key_mode, tg_mode, trial_mode]) != 1:
         raise HTTPException(
             status_code=400,
             detail="provide exactly one of: key (with platform+device_stable_id), telegram_id, or (platform+device_stable_id)",
         )
-    if has_k and (not platform or not device_stable_id):
+    if has_k and not has_dev_pair:
         raise HTTPException(status_code=400, detail="key requires platform and device_stable_id")
 
 
@@ -228,11 +231,14 @@ class RefreshBody(BaseModel):
     def _one_identity(self) -> RefreshBody:
         has_k = bool(self.key and self.key.strip())
         has_tg = self.telegram_id is not None
-        has_dev = bool(self.platform and self.device_stable_id)
-        modes = sum([has_k, has_tg, has_dev])
+        has_dev_pair = bool(self.platform and self.device_stable_id)
+        key_mode = has_k
+        tg_mode = has_tg
+        trial_mode = has_dev_pair and not has_k
+        modes = sum([key_mode, tg_mode, trial_mode])
         if modes != 1:
             raise ValueError("provide exactly one of: key, telegram_id, or (platform + device_stable_id)")
-        if has_k and (not self.platform or not self.device_stable_id):
+        if has_k and not has_dev_pair:
             raise ValueError("key requires platform and device_stable_id")
         return self
 
