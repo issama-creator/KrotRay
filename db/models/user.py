@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, String, func
+from sqlalchemy import BigInteger, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
@@ -34,18 +34,18 @@ class User(Base):
         comment="Стабильный id устройства (ANDROID_ID / аналог); уникально вместе с platform",
     )
 
+    # Без server_default: иначе SQLAlchemy не кладёт колонки в INSERT и ждёт значение из БД;
+    # на Postgres после миграции 016 у created_at нет DEFAULT → NOT NULL violation.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
         default=_utc_now,
         comment="Регистрация строки; начало окна триала key-factory",
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
+        onupdate=_utc_now,
         default=_utc_now,
         comment="Последнее изменение записи",
     )
