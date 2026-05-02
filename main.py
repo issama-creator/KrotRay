@@ -24,14 +24,7 @@ async def main() -> None:
     dp = Dispatcher()
     dp.include_router(router)
 
-    # Убираем кнопку «Открыть» в списке чатов — остаётся только «Личный кабинет» в чате
-    try:
-        await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
-        logging.info("Кнопка меню бота сброшена (кнопка «Открыть» убрана)")
-    except Exception as e:
-        logging.warning("Не удалось сбросить кнопку меню бота: %s", e)
-
-    # API для Mini App
+    # API для Mini App (поднимаем до запросов к Telegram — иначе долгий таймаут меню блокирует curl/nginx)
     host = "0.0.0.0"
     port = 8000
     try:
@@ -45,8 +38,14 @@ async def main() -> None:
     config = uvicorn.Config("api.main:app", host=host, port=port)
     server = uvicorn.Server(config)
     api_task = asyncio.create_task(server.serve())
-    # Дать uvicorn занять порт до запросов к Telegram (иначе при падении бота сразу 502)
     await asyncio.sleep(0.3)
+
+    # Убираем кнопку «Открыть» в списке чатов — после того как HTTP уже слушает порт
+    try:
+        await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+        logging.info("Кнопка меню бота сброшена (кнопка «Открыть» убрана)")
+    except Exception as e:
+        logging.warning("Не удалось сбросить кнопку меню бота: %s", e)
 
     try:
         await dp.start_polling(bot)
