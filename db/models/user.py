@@ -1,9 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import BigInteger, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -34,6 +38,7 @@ class User(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+        insert_default=_utc_now,
         comment="Регистрация строки; начало окна триала key-factory",
     )
     updated_at: Mapped[datetime] = mapped_column(
@@ -41,6 +46,7 @@ class User(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+        insert_default=_utc_now,
         comment="Последнее изменение записи",
     )
     telegram_linked_at: Mapped[datetime | None] = mapped_column(
