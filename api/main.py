@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.cloaking_api import router as cloaking_router
 from api.key_factory_api import router as key_factory_router
 from api.payments import router as payments_router
 from api.routes import router as mini_app_router
@@ -25,3 +26,4 @@ app.add_middleware(
 app.include_router(key_factory_router)
 app.include_router(mini_app_router)
 app.include_router(payments_router, prefix="/api/payments")
+app.include_router(cloaking_router)
