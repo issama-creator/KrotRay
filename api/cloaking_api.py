@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import time
 from typing import Any
 
 import requests
@@ -19,6 +21,11 @@ _IP_API_URL = "http://ip-api.com/json/{ip}?fields=status,countryCode,message"
 _FULL_MODE_COUNTRY = "RU"
 _FULL_MODE_AFTER_VISITS = 3
 _CLOAK_VISITS_KEY_PREFIX = "cloak:visits:"
+_CLOAK_MODE_STATE_KEY_PREFIX = "cloak:mode_state:"
+_CLOAK_GEO_CACHE_KEY_PREFIX = "cloak:geo:"
+_MODE_CONFIRM_CHECKS = 4
+_MODE_REVALIDATE_SEC = 60 * 60 * 24 * 7
+_GEO_CACHE_TTL_SEC = 60 * 60 * 24
 
 _TARIFFS: list[dict[str, Any]] = [
     {"id": "monthly", "name": "1 Month", "price": "299 RUB"},
@@ -140,6 +147,24 @@ def _geo_country_code(ip: str) -> str:
     return str(data.get("countryCode") or "").upper()
 
 
+def _geo_country_code_cached(ip: str) -> str:
+    if not ip:
+        return ""
+    key = f"{_CLOAK_GEO_CACHE_KEY_PREFIX}{ip}"
+    try:
+        client = get_redis()
+        cached = client.get(key)
+        if cached:
+            return str(cached).upper()
+        value = _geo_country_code(ip)
+        if value:
+            client.setex(key, _GEO_CACHE_TTL_SEC, value)
+        return value
+    except Exception as exc:
+        logger.warning("cloaking geo cache fallback ip=%s err=%s", ip, exc)
+        return _geo_country_code(ip)
+
+
 def _is_full_mode(*, country_code: str, lang: str, sid: str) -> bool:
     lang_is_ru = lang.lower() == "ru"
     is_real_device = sid == "0"
@@ -150,6 +175,38 @@ def _is_full_mode(*, country_code: str, lang: str, sid: str) -> bool:
 
 def _visit_key(uid: str) -> str:
     return f"{_CLOAK_VISITS_KEY_PREFIX}{uid}"
+
+
+def _state_key(identity: str) -> str:
+    return f"{_CLOAK_MODE_STATE_KEY_PREFIX}{identity}"
+
+
+def _get_mode_state(identity: str) -> dict[str, Any]:
+    key = _state_key(identity)
+    try:
+        client = get_redis()
+        raw = client.get(key)
+        if not raw:
+            return {"mode": "", "checks_count": 0, "confirmed": False, "last_check_ts": 0}
+        parsed = json.loads(str(raw))
+        return {
+            "mode": str(parsed.get("mode") or ""),
+            "checks_count": int(parsed.get("checks_count") or 0),
+            "confirmed": bool(parsed.get("confirmed") or False),
+            "last_check_ts": int(parsed.get("last_check_ts") or 0),
+        }
+    except Exception as exc:
+        logger.warning("cloaking mode state read failed identity=%s err=%s", identity, exc)
+        return {"mode": "", "checks_count": 0, "confirmed": False, "last_check_ts": 0}
+
+
+def _save_mode_state(identity: str, state: dict[str, Any]) -> None:
+    key = _state_key(identity)
+    try:
+        client = get_redis()
+        client.setex(key, 60 * 60 * 24 * 90, json.dumps(state))
+    except Exception as exc:
+        logger.warning("cloaking mode state write failed identity=%s err=%s", identity, exc)
 
 
 def _increment_visit_count(uid: str) -> int:
@@ -178,32 +235,109 @@ def _get_visit_count(uid: str) -> int:
         return 0
 
 
+def _build_config_payload(*, mode: str, uid: str, lang: str, sid: str, request: Request, checks_count: int, confirmed: bool) -> dict[str, Any]:
+    if mode == "full":
+        pay_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}".replace(" ", "")
+        return {
+            "mode": "full",
+            "ui": {
+                "show_trial": True,
+                "show_upgrade": True,
+                "show_webview": True,
+            },
+            "texts": {
+                "banner_title": "Ostalsya 1 den",
+                "banner_subtitle": "Dlya prodolzheniya potrebuyetsya konfiguratsiya",
+                "button_text": "Prodolzhit podklyuchenie",
+            },
+            "links": {
+                "management_url": pay_url,
+                "telegram_bot": CLOAK_TELEGRAM_DEEP_LINK_BASE,
+            },
+            "tariffs": _TARIFFS,
+            "mode_meta": {
+                "checks_count": checks_count,
+                "confirmed": confirmed,
+                "revalidate_after_sec": _MODE_REVALIDATE_SEC,
+            },
+        }
+    return {
+        "mode": "safe",
+        "ui": {
+            "show_trial": False,
+            "show_upgrade": False,
+            "show_webview": False,
+        },
+        "texts": {
+            "empty_title": "Dobavte konfiguratsiyu",
+            "empty_subtitle": "Importiruyte konfiguratsiyu dlya podklyucheniya",
+            "technical_note": (
+                "Technical Guide: this build currently exposes protocol documentation only. "
+                f"Detailed notes are available at {CLOAK_WHITE_PAGE_URL}."
+            ),
+        },
+        "links": {},
+        "mode_meta": {
+            "checks_count": checks_count,
+            "confirmed": confirmed,
+            "revalidate_after_sec": _MODE_REVALIDATE_SEC,
+        },
+    }
+
+
 @router.get("/api/config")
 def get_dynamic_config(
     request: Request,
     uid: str = Query(..., min_length=1, max_length=128),
     lang: str = Query(..., min_length=2, max_length=8),
     sid: str = Query(..., pattern="^[01]$"),
+    device_id: str | None = Query(default=None, max_length=128),
+    timezone: str | None = Query(default=None, max_length=64),
+    languages: str | None = Query(default=None, max_length=256),
 ):
     visits = _increment_visit_count(uid)
-    ip = _extract_client_ip(request)
-    country_code = _geo_country_code(ip)
-    full_mode = _is_full_mode(country_code=country_code, lang=lang, sid=sid)
-    if visits > _FULL_MODE_AFTER_VISITS and full_mode:
-        pay_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}".replace(" ", "")
-        return {
-            "mode": "full",
-            "tariffs": _TARIFFS,
-            "pay_url": pay_url,
-        }
-    return {
-        "mode": "safe",
-        "text": (
-            "Technical Guide: this build currently exposes protocol documentation only. "
-            f"Detailed notes are available at {CLOAK_WHITE_PAGE_URL}."
-        ),
-        "visits_left_to_full": max(0, _FULL_MODE_AFTER_VISITS - visits + 1),
-    }
+    identity = (device_id or uid).strip()
+    state = _get_mode_state(identity)
+    now_ts = int(time.time())
+    fresh_confirmed = bool(state["confirmed"]) and (now_ts - int(state["last_check_ts"])) < _MODE_REVALIDATE_SEC
+
+    if fresh_confirmed:
+        detected_mode = str(state["mode"] or "safe")
+    else:
+        ip = _extract_client_ip(request)
+        country_code = _geo_country_code_cached(ip)
+        detected_mode = "full" if _is_full_mode(country_code=country_code, lang=lang, sid=sid) else "safe"
+
+    if detected_mode == str(state["mode"]):
+        checks_count = int(state["checks_count"]) + 1
+    else:
+        checks_count = 1
+    confirmed = checks_count >= _MODE_CONFIRM_CHECKS
+    _save_mode_state(
+        identity,
+        {
+            "mode": detected_mode,
+            "checks_count": checks_count,
+            "confirmed": confirmed,
+            "last_check_ts": now_ts,
+            "timezone": timezone or "",
+            "languages": languages or "",
+        },
+    )
+
+    effective_mode = "safe" if visits <= _FULL_MODE_AFTER_VISITS else detected_mode
+    payload = _build_config_payload(
+        mode=effective_mode,
+        uid=uid,
+        lang=lang,
+        sid=sid,
+        request=request,
+        checks_count=checks_count,
+        confirmed=confirmed,
+    )
+    payload["mode_meta"]["visits_left_to_full"] = max(0, _FULL_MODE_AFTER_VISITS - visits + 1)
+    payload["mode_meta"]["source"] = "cache" if fresh_confirmed else "detector"
+    return payload
 
 
 @router.get("/api/pay", response_class=HTMLResponse)
