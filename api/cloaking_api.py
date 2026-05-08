@@ -1,4 +1,4 @@
-"""Dynamic cloaking config API and payment landing page."""
+"""Dynamic backend-driven UI config for SAFE/FULL modes."""
 
 from __future__ import annotations
 
@@ -12,20 +12,21 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
 from bot.config import CLOAK_TELEGRAM_DEEP_LINK_BASE, CLOAK_WHITE_PAGE_URL
-from services.minimal_lb import get_redis
+from services.minimal_lb import get_redis, load_server, load_server_ids
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["cloaking"])
 
 _IP_API_URL = "http://ip-api.com/json/{ip}?fields=status,countryCode,message"
 _FULL_MODE_COUNTRY = "RU"
-_FULL_MODE_AFTER_VISITS = 3
-_CLOAK_VISITS_KEY_PREFIX = "cloak:visits:"
 _CLOAK_MODE_STATE_KEY_PREFIX = "cloak:mode_state:"
 _CLOAK_GEO_CACHE_KEY_PREFIX = "cloak:geo:"
+_CLOAK_TRIAL_KEY_PREFIX = "cloak:trial_started_at:"
+_CLOAK_SUB_UNTIL_KEY_PREFIX = "cloak:subscription_until:"
 _MODE_CONFIRM_CHECKS = 4
 _MODE_REVALIDATE_SEC = 60 * 60 * 24 * 7
 _GEO_CACHE_TTL_SEC = 60 * 60 * 24
+_TRIAL_DAYS = 3
 
 _TARIFFS: list[dict[str, Any]] = [
     {"id": "monthly", "name": "1 Month", "price": "299 RUB"},
@@ -173,10 +174,6 @@ def _is_full_mode(*, country_code: str, lang: str, sid: str) -> bool:
     return (country_code == _FULL_MODE_COUNTRY and lang_is_ru and is_real_device) or (lang_is_ru and is_real_device)
 
 
-def _visit_key(uid: str) -> str:
-    return f"{_CLOAK_VISITS_KEY_PREFIX}{uid}"
-
-
 def _state_key(identity: str) -> str:
     return f"{_CLOAK_MODE_STATE_KEY_PREFIX}{identity}"
 
@@ -209,21 +206,31 @@ def _save_mode_state(identity: str, state: dict[str, Any]) -> None:
         logger.warning("cloaking mode state write failed identity=%s err=%s", identity, exc)
 
 
-def _increment_visit_count(uid: str) -> int:
-    key = _visit_key(uid)
+def _trial_key(identity: str) -> str:
+    return f"{_CLOAK_TRIAL_KEY_PREFIX}{identity}"
+
+
+def _sub_until_key(identity: str) -> str:
+    return f"{_CLOAK_SUB_UNTIL_KEY_PREFIX}{identity}"
+
+
+def _get_or_set_trial_started_at(identity: str) -> int:
+    now_ts = int(time.time())
+    key = _trial_key(identity)
     try:
         client = get_redis()
-        visits = int(client.incr(key))
-        if visits == 1:
-            client.expire(key, 60 * 60 * 24 * 90)
-        return visits
+        raw = client.get(key)
+        if raw is not None:
+            return int(raw)
+        client.setex(key, 60 * 60 * 24 * 365, str(now_ts))
+        return now_ts
     except Exception as exc:
-        logger.warning("cloaking visit counter increment failed uid=%s err=%s", uid, exc)
-        return 1
+        logger.warning("cloaking trial read/write failed identity=%s err=%s", identity, exc)
+        return now_ts
 
 
-def _get_visit_count(uid: str) -> int:
-    key = _visit_key(uid)
+def _get_subscription_until(identity: str) -> int:
+    key = _sub_until_key(identity)
     try:
         client = get_redis()
         raw = client.get(key)
@@ -231,42 +238,104 @@ def _get_visit_count(uid: str) -> int:
             return 0
         return int(raw)
     except Exception as exc:
-        logger.warning("cloaking visit counter read failed uid=%s err=%s", uid, exc)
+        logger.warning("cloaking subscription cache read failed identity=%s err=%s", identity, exc)
         return 0
 
 
-def _build_config_payload(*, mode: str, uid: str, lang: str, sid: str, request: Request, checks_count: int, confirmed: bool) -> dict[str, Any]:
+def _load_servers_from_cache(limit: int = 4) -> list[dict[str, Any]]:
+    try:
+        client = get_redis()
+        ids = load_server_ids(client)
+        result: list[dict[str, Any]] = []
+        for sid in ids:
+            srv = load_server(client, sid)
+            if srv is None:
+                continue
+            if srv.status != "alive":
+                continue
+            result.append(
+                {
+                    "id": srv.server_id,
+                    "type": srv.server_type,
+                    "host": srv.host,
+                    "status": srv.status,
+                    "load": round(srv.load, 4),
+                }
+            )
+            if len(result) >= limit:
+                break
+        return result
+    except Exception as exc:
+        logger.warning("cloaking servers cache read failed err=%s", exc)
+        return []
+
+
+def _build_config_payload(
+    *,
+    mode: str,
+    uid: str,
+    lang: str,
+    sid: str,
+    request: Request,
+    checks_count: int,
+    confirmed: bool,
+    trial_active: bool,
+    subscription_active: bool,
+    trial_until_ts: int,
+    subscription_until_ts: int,
+    servers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    has_access = trial_active or subscription_active
+    is_full = mode == "full"
+    show_webview = is_full and not has_access
+    show_upgrade = is_full and not has_access
+    show_expired_modal = not has_access
+    management_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
+
     if mode == "full":
-        pay_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}".replace(" ", "")
         return {
             "mode": "full",
+            "trial_active": trial_active,
+            "subscription_active": subscription_active,
             "ui": {
-                "show_trial": True,
-                "show_upgrade": True,
-                "show_webview": True,
+                "show_trial": trial_active,
+                "show_upgrade": show_upgrade,
+                "show_webview": show_webview,
+                "show_expired_modal": show_expired_modal,
+                "show_management_center": show_webview,
             },
             "texts": {
                 "banner_title": "Ostalsya 1 den",
                 "banner_subtitle": "Dlya prodolzheniya potrebuyetsya konfiguratsiya",
-                "button_text": "Prodolzhit podklyuchenie",
+                "button_text": "Перейти в Telegram",
+                "expired_title": "Бесплатный период завершён",
+                "expired_subtitle": "Для продления доступа перейдите в нашего Telegram-бота",
             },
             "links": {
-                "management_url": pay_url,
+                "management_url": management_url,
+                "webview_url": management_url,
                 "telegram_bot": CLOAK_TELEGRAM_DEEP_LINK_BASE,
             },
             "tariffs": _TARIFFS,
+            "servers": servers,
             "mode_meta": {
                 "checks_count": checks_count,
                 "confirmed": confirmed,
                 "revalidate_after_sec": _MODE_REVALIDATE_SEC,
+                "trial_until_ts": trial_until_ts,
+                "subscription_until_ts": subscription_until_ts,
             },
         }
     return {
         "mode": "safe",
+        "trial_active": trial_active,
+        "subscription_active": subscription_active,
         "ui": {
-            "show_trial": False,
+            "show_trial": trial_active,
             "show_upgrade": False,
             "show_webview": False,
+            "show_expired_modal": show_expired_modal,
+            "show_management_center": False,
         },
         "texts": {
             "empty_title": "Dobavte konfiguratsiyu",
@@ -277,10 +346,13 @@ def _build_config_payload(*, mode: str, uid: str, lang: str, sid: str, request: 
             ),
         },
         "links": {},
+        "servers": servers,
         "mode_meta": {
             "checks_count": checks_count,
             "confirmed": confirmed,
             "revalidate_after_sec": _MODE_REVALIDATE_SEC,
+            "trial_until_ts": trial_until_ts,
+            "subscription_until_ts": subscription_until_ts,
         },
     }
 
@@ -292,10 +364,11 @@ def get_dynamic_config(
     lang: str = Query(..., min_length=2, max_length=8),
     sid: str = Query(..., pattern="^[01]$"),
     device_id: str | None = Query(default=None, max_length=128),
+    locale: str | None = Query(default=None, max_length=16),
     timezone: str | None = Query(default=None, max_length=64),
     languages: str | None = Query(default=None, max_length=256),
+    app_version: str | None = Query(default=None, max_length=32),
 ):
-    visits = _increment_visit_count(uid)
     identity = (device_id or uid).strip()
     state = _get_mode_state(identity)
     now_ts = int(time.time())
@@ -320,12 +393,21 @@ def get_dynamic_config(
             "checks_count": checks_count,
             "confirmed": confirmed,
             "last_check_ts": now_ts,
+            "locale": locale or "",
             "timezone": timezone or "",
             "languages": languages or "",
+            "app_version": app_version or "",
         },
     )
 
-    effective_mode = "safe" if visits <= _FULL_MODE_AFTER_VISITS else detected_mode
+    trial_started_at = _get_or_set_trial_started_at(identity)
+    trial_until_ts = trial_started_at + (_TRIAL_DAYS * 24 * 60 * 60)
+    trial_active = now_ts < trial_until_ts
+    subscription_until_ts = _get_subscription_until(identity)
+    subscription_active = subscription_until_ts > now_ts
+    servers = _load_servers_from_cache(limit=4)
+
+    effective_mode = detected_mode
     payload = _build_config_payload(
         mode=effective_mode,
         uid=uid,
@@ -334,20 +416,29 @@ def get_dynamic_config(
         request=request,
         checks_count=checks_count,
         confirmed=confirmed,
+        trial_active=trial_active,
+        subscription_active=subscription_active,
+        trial_until_ts=trial_until_ts,
+        subscription_until_ts=subscription_until_ts,
+        servers=servers,
     )
-    payload["mode_meta"]["visits_left_to_full"] = max(0, _FULL_MODE_AFTER_VISITS - visits + 1)
     payload["mode_meta"]["source"] = "cache" if fresh_confirmed else "detector"
     return payload
 
 
 @router.get("/api/pay", response_class=HTMLResponse)
-def get_pay_page(request: Request, uid: str = Query(..., min_length=1, max_length=128)):
-    visits = _get_visit_count(uid)
-    if visits <= _FULL_MODE_AFTER_VISITS:
+def get_pay_page(
+    request: Request,
+    uid: str = Query(..., min_length=1, max_length=128),
+    device_id: str | None = Query(default=None, max_length=128),
+):
+    identity = (device_id or uid).strip()
+    state = _get_mode_state(identity)
+    cached_mode = str(state.get("mode") or "")
+    if cached_mode == "safe":
         return HTMLResponse(content=_WHITE_PAGE_HTML)
     ip = _extract_client_ip(request)
-    country_code = _geo_country_code(ip)
-    # Keep pay page behavior aligned with /api/config VPN fallback.
+    country_code = _geo_country_code_cached(ip)
     lang = (request.query_params.get("lang") or "").strip().lower()
     sid = (request.query_params.get("sid") or "").strip()
     allow_vpn_fallback = bool(lang and sid)
