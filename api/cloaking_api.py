@@ -18,6 +18,7 @@ from bot.config import (
     CLOAK_TELEGRAM_BOT_PUBLIC,
     CLOAK_TELEGRAM_DEEP_LINK_BASE,
     CLOAK_WHITE_PAGE_URL,
+    cloak_telegram_include_start_payload,
     cloak_telegram_renewal_hint_ru,
 )
 from db.session import SessionLocal
@@ -440,18 +441,24 @@ def _resolve_telegram_redirect(uid: str) -> str:
         if "{uid}" in custom_url:
             return custom_url.replace("{uid}", uid)
         return custom_url
-    return f"{CLOAK_TELEGRAM_DEEP_LINK_BASE}{uid}"
+    if cloak_telegram_include_start_payload():
+        return f"{CLOAK_TELEGRAM_DEEP_LINK_BASE}{uid}"
+    return f"tg://resolve?domain={CLOAK_TELEGRAM_BOT_PUBLIC}"
 
 
-def _telegram_pay_start_param(uid: str) -> str:
-    """Параметр deep link start (совпадает с суффиксом после pay_ в CLOAK_TELEGRAM_DEEP_LINK_BASE)."""
+def _telegram_pay_start_param(uid: str) -> str | None:
+    """Параметр ?start= для t.me (или None, если открываем бота без payload)."""
+    if not cloak_telegram_include_start_payload():
+        return None
     return f"pay_{uid}"
 
 
 def _telegram_https_open(uid: str) -> str:
-    """https://t.me/<bot>?start=... — надёжнее открывается с мобильных, чем только tg://."""
-    start = quote(_telegram_pay_start_param(uid), safe="")
-    return f"https://t.me/{CLOAK_TELEGRAM_BOT_PUBLIC}?start={start}"
+    """https://t.me/<bot> — с ?start= только если включён CLOAK_TELEGRAM_INCLUDE_START_PAYLOAD."""
+    sp = _telegram_pay_start_param(uid)
+    if sp is None:
+        return f"https://t.me/{CLOAK_TELEGRAM_BOT_PUBLIC}"
+    return f"https://t.me/{CLOAK_TELEGRAM_BOT_PUBLIC}?start={quote(sp, safe='')}"
 
 
 def _build_config_payload(
@@ -548,9 +555,10 @@ def _build_config_payload(
             },
             "modal": modal,
             "texts": texts,
+            # Основной переход — https://t.me/<bot> (универсально для клиентов); tg:// в telegram_deeplink — запасной вариант.
             "links": {
-                "management_url": telegram_url,
-                "telegram_bot": telegram_url,
+                "management_url": telegram_https_url,
+                "telegram_bot": telegram_https_url,
                 "telegram_deeplink": telegram_url,
                 "telegram_https": telegram_https_url,
                 "fallback_web_url": pay_fallback_web_url,
@@ -563,7 +571,7 @@ def _build_config_payload(
                 "start_param": _telegram_pay_start_param(uid),
                 "deeplink": telegram_url,
                 "https_url": telegram_https_url,
-                "open_url": telegram_url,
+                "open_url": telegram_https_url,
             },
         }
         return _deep_merge(full_payload, _get_json_override(_CLOAK_UI_FULL_KEY))

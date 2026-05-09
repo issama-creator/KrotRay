@@ -21,6 +21,15 @@ def cloak_telegram_renewal_hint_ru() -> str:
     if CLOAK_TELEGRAM_RENEWAL_HINT_RU:
         return CLOAK_TELEGRAM_RENEWAL_HINT_RU
     return f"Продлите подписку в Telegram — @{CLOAK_TELEGRAM_BOT_PUBLIC}"
+
+
+def cloak_telegram_include_start_payload() -> bool:
+    """
+    Если False — ссылки только открывают чат с ботом без ?start=… (оплата и так по telegram_id).
+    Если True — в start передаётся pay_<uid>, чтобы бот до оплаты знал устройственный uid из приложения.
+    """
+    v = (os.getenv("CLOAK_TELEGRAM_INCLUDE_START_PAYLOAD") or "1").strip().lower()
+    return v not in ("0", "false", "no", "off")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./krotray.db")  # ЮKassa (Итерация 5) — strip() убирает пробелы и \r при копировании из .env
 YOOKASSA_SHOP_ID = (os.getenv("YOOKASSA_SHOP_ID") or "").strip()
 YOOKASSA_SECRET_KEY = (os.getenv("YOOKASSA_SECRET_KEY") or "").strip()
