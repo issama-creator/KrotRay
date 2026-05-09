@@ -6,21 +6,20 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
 import requests
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from bot.config import CLOAK_TELEGRAM_DEEP_LINK_BASE, CLOAK_WHITE_PAGE_URL
-from db.models.subscription import Subscription
-from db.models.user import User
 from db.session import SessionLocal
 from services.minimal_lb import get_redis, load_server, load_server_ids
-from services.vpn_access import TRIAL_DAYS, user_has_vpn_access
+from services.vpn_access import (
+    access_subscription_snapshot,
+    resolve_user_device_then_telegram,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["cloaking"])
@@ -35,78 +34,6 @@ _CLOAK_UI_SAFE_KEY = "cloak:ui:safe"
 _MODE_CONFIRM_CHECKS = 4
 _MODE_REVALIDATE_SEC = 60 * 60 * 24 * 7
 _GEO_CACHE_TTL_SEC = 60 * 60 * 24
-
-
-def _to_utc_dt(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=dt_timezone.utc)
-    return value.astimezone(dt_timezone.utc)
-
-
-def _db_access_snapshot(
-    db: Session,
-    *,
-    platform: str,
-    device_stable_id: str,
-    now: datetime,
-) -> dict[str, Any]:
-    """Триал и оплата только из Postgres — как GET /servers (user_has_vpn_access)."""
-    user = db.scalar(
-        select(User).where(
-            User.platform == platform,
-            User.device_stable_id == device_stable_id,
-        )
-    )
-    if user is None:
-        return {
-            "user_id": None,
-            "account_registered": False,
-            "has_access": False,
-            "trial_active": False,
-            "subscription_active": False,
-            "trial_until_ts": 0,
-            "subscription_until_ts": 0,
-        }
-
-    created_at = _to_utc_dt(user.created_at) or now
-    trial_end = created_at + timedelta(days=TRIAL_DAYS)
-    trial_until_ts = int(trial_end.timestamp())
-
-    sub_col = _to_utc_dt(user.subscription_expires_at)
-    paid_from_user = bool(sub_col and sub_col > now)
-    sub_ts = int(sub_col.timestamp()) if paid_from_user and sub_col else 0
-
-    row = db.scalars(
-        select(Subscription)
-        .where(Subscription.user_id == user.id)
-        .where(Subscription.status == "active")
-        .order_by(Subscription.expires_at.desc())
-        .limit(1)
-    ).first()
-    paid_from_sub = False
-    if row and row.expires_at:
-        exp = _to_utc_dt(row.expires_at)
-        if exp and exp > now:
-            paid_from_sub = True
-            sub_ts = max(sub_ts, int(exp.timestamp()))
-
-    has_paid = paid_from_user or paid_from_sub
-    in_trial_calendar = now < trial_end
-    trial_active = bool(in_trial_calendar and not has_paid)
-    subscription_active = bool(has_paid)
-    has_access = user_has_vpn_access(user, now, db)
-
-    return {
-        "user_id": user.id,
-        "account_registered": True,
-        "has_access": has_access,
-        "trial_active": trial_active,
-        "subscription_active": subscription_active,
-        "trial_until_ts": trial_until_ts,
-        "subscription_until_ts": sub_ts,
-    }
 
 
 def _trial_days_display_offset() -> int:
@@ -539,6 +466,7 @@ def _build_config_payload(
     now_ts: int,
     account_registered: bool,
     user_id: int | None,
+    account_resolution: str,
 ) -> dict[str, Any]:
     has_access = trial_active or subscription_active
     trial_days_left = _ceil_days_remaining(now_ts, trial_until_ts)
@@ -567,6 +495,7 @@ def _build_config_payload(
         "trial_days_display_offset_source": off_src,
         "account_registered": account_registered,
         "user_id": user_id,
+        "account_resolution": account_resolution,
     }
 
     if mode == "full":
@@ -676,7 +605,13 @@ def get_dynamic_config(
     timezone: str | None = Query(default=None, max_length=64),
     languages: str | None = Query(default=None, max_length=256),
     app_version: str | None = Query(default=None, max_length=32),
+    telegram_id: int | None = Query(default=None, ge=1, description="Опционально: fallback User по telegram (устаревшее имя)"),
+    t_id: int | None = Query(default=None, ge=1, description="Опционально: то же, что telegram_id (имя параметра с клиента)"),
 ):
+    if telegram_id is not None and t_id is not None and telegram_id != t_id:
+        raise HTTPException(status_code=400, detail="telegram_id and t_id disagree")
+    linked_telegram_id = telegram_id if telegram_id is not None else t_id
+
     identity = (device_id or uid).strip()
     plat_raw = (platform or "android").strip().lower()
     plat = plat_raw if plat_raw in ("android", "ios") else "android"
@@ -713,12 +648,14 @@ def get_dynamic_config(
     now_dt = datetime.now(dt_timezone.utc)
     db = SessionLocal()
     try:
-        snap = _db_access_snapshot(
+        resolved_user, resolution = resolve_user_device_then_telegram(
             db,
             platform=plat,
             device_stable_id=identity,
-            now=now_dt,
+            telegram_id=linked_telegram_id,
         )
+        snap = access_subscription_snapshot(resolved_user, now_dt, db)
+        snap["account_resolution"] = resolution if resolution is not None else "none"
     finally:
         db.close()
 
@@ -729,6 +666,7 @@ def get_dynamic_config(
     account_registered = bool(snap["account_registered"])
     user_id_snap = snap.get("user_id")
     user_id = int(user_id_snap) if user_id_snap is not None else None
+    account_resolution = str(snap.get("account_resolution") or "none")
 
     servers = _load_servers_from_cache(limit=4)
 
@@ -750,6 +688,7 @@ def get_dynamic_config(
         now_ts=now_ts,
         account_registered=account_registered,
         user_id=user_id,
+        account_resolution=account_resolution,
     )
     payload["mode_meta"]["source"] = "cache" if fresh_confirmed else "detector"
     return payload

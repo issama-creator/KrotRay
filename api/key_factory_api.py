@@ -161,7 +161,8 @@ def _servers_identity_exclusive(
     has_tg = telegram_id is not None
     has_dev_pair = bool(platform and device_stable_id)
     key_mode = has_k
-    tg_mode = has_tg
+    # Режим «только Telegram» — без пары platform+device. Иначе t_id с устройством = триал/ключ, не второй режим.
+    tg_mode = has_tg and not has_dev_pair
     trial_mode = has_dev_pair and not has_k
     if sum([key_mode, tg_mode, trial_mode]) != 1:
         raise HTTPException(
@@ -234,17 +235,20 @@ def _normalize_servers(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 class RefreshBody(BaseModel):
     key: str | None = Field(default=None, max_length=64)
     telegram_id: int | None = Field(default=None, ge=1)
+    t_id: int | None = Field(default=None, ge=1, description="С клиента: то же, что telegram_id")
     platform: Literal["android", "ios"] | None = None
     device_stable_id: str | None = Field(default=None, max_length=128)
 
     @model_validator(mode="after")
     def _one_identity(self) -> RefreshBody:
+        if self.telegram_id is not None and self.t_id is not None and self.telegram_id != self.t_id:
+            raise ValueError("telegram_id and t_id disagree")
         has_k = bool(self.key and self.key.strip())
-        has_tg = self.telegram_id is not None
         has_dev_pair = bool(self.platform and self.device_stable_id)
-        key_mode = has_k
-        tg_mode = has_tg
+        linked_tg = self.telegram_id if self.telegram_id is not None else self.t_id
+        tg_mode = linked_tg is not None and not has_dev_pair
         trial_mode = has_dev_pair and not has_k
+        key_mode = has_k
         modes = sum([key_mode, tg_mode, trial_mode])
         if modes != 1:
             raise ValueError("provide exactly one of: key, telegram_id, or (platform + device_stable_id)")
@@ -275,21 +279,29 @@ def _payload_servers_ok(user: User, servers_norm: list[dict[str, Any]]) -> dict[
 def get_servers(
     key: str | None = Query(None, max_length=64, description="Ключ из ЛК после оплаты; вместе с platform+device_stable_id"),
     telegram_id: int | None = Query(None, ge=1),
+    t_id: int | None = Query(None, ge=1, description="С клиента: то же, что telegram_id"),
     platform: str | None = Query(None, description="android | ios"),
     device_stable_id: str | None = Query(None, max_length=128),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    if telegram_id is not None and t_id is not None and telegram_id != t_id:
+        raise HTTPException(status_code=400, detail="telegram_id and t_id disagree")
+    tg_q = telegram_id if telegram_id is not None else t_id
+
     now_dt = datetime.now(timezone.utc)
+    has_dev_pair = bool(platform and device_stable_id)
+    tg_for_resolve = tg_q if not has_dev_pair else None
+
     _servers_identity_exclusive(
         key=key,
-        telegram_id=telegram_id,
+        telegram_id=tg_q,
         platform=platform,
         device_stable_id=device_stable_id,
     )
     user, pre_err = _resolve_servers_user(
         db,
         key=key,
-        telegram_id=telegram_id,
+        telegram_id=tg_for_resolve,
         platform=platform,
         device_stable_id=device_stable_id,
     )
@@ -363,10 +375,14 @@ def get_servers(
 @router.post("/refresh", summary="Перевыбор серверов (cooldown)")
 def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[str, Any]:
     now_dt = datetime.now(timezone.utc)
+    has_dev_pair = bool(body.platform and body.device_stable_id)
+    linked_tg = body.telegram_id if body.telegram_id is not None else body.t_id
+    tg_for_resolve = linked_tg if not has_dev_pair else None
+
     user, pre_err = _resolve_servers_user(
         db,
         key=body.key,
-        telegram_id=body.telegram_id,
+        telegram_id=tg_for_resolve,
         platform=body.platform,
         device_stable_id=body.device_stable_id,
     )
