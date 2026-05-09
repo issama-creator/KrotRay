@@ -13,7 +13,11 @@ import requests
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
-from bot.config import CLOAK_TELEGRAM_DEEP_LINK_BASE, CLOAK_WHITE_PAGE_URL
+from bot.config import (
+    CLOAK_TELEGRAM_DEEP_LINK_BASE,
+    CLOAK_WHITE_PAGE_URL,
+    cloak_telegram_renewal_hint_ru,
+)
 from db.session import SessionLocal
 from services.minimal_lb import get_redis, load_server, load_server_ids
 from services.vpn_access import (
@@ -62,18 +66,6 @@ def _trial_days_display_offset_for_identity(identity: str) -> tuple[int, str]:
         logger.warning("cloak trial_display_off read failed identity=%s err=%s", identity, exc)
     env_off = _trial_days_display_offset()
     return env_off, "env" if env_off != 0 else "none"
-
-_TARIFFS: list[dict[str, Any]] = [
-    {"id": "monthly", "name": "1 Month", "price": "299 RUB"},
-    {"id": "quarterly", "name": "3 Months", "price": "799 RUB"},
-    {"id": "semiannual", "name": "6 Months", "price": "1399 RUB"},
-]
-_WEBVIEW_DEFAULT_THEME = {
-    "primary_color": "#3B82F6",
-    "background_color": "#0F172A",
-    "card_color": "#111827",
-    "text_color": "#FFFFFF",
-}
 
 _WHITE_PAGE_HTML = """<!doctype html>
 <html lang="en">
@@ -327,6 +319,7 @@ def _full_modal_and_texts(
     trial_active: bool,
     subscription_active: bool,
     trial_days_left: int,
+    telegram_renewal_hint: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """modal + texts aligned with trial/subscription state (single source of truth)."""
     if subscription_active:
@@ -357,20 +350,20 @@ def _full_modal_and_texts(
             "banner_subtitle": sub,
             "button_text": "Понятно",
             "expired_title": "Бесплатный период завершён",
-            "expired_subtitle": "Для продления доступа откройте центр управления.",
+            "expired_subtitle": telegram_renewal_hint,
         }
         return modal, texts
 
-    # No trial / no subscription — expired managed flow (FULL)
+    # No trial / no subscription — после триала: модалка с переходом в Telegram
     modal = {
         "title": "Бесплатный период завершён",
-        "subtitle": "Для продления доступа откройте центр управления.",
-        "button_text": "Открыть центр управления",
+        "subtitle": telegram_renewal_hint,
+        "button_text": "Открыть Telegram",
     }
     texts = {
         "banner_title": "Доступ к подключению недоступен",
-        "banner_subtitle": "Откройте центр управления, чтобы продолжить.",
-        "button_text": "Открыть центр управления",
+        "banner_subtitle": telegram_renewal_hint,
+        "button_text": "Открыть Telegram",
         "expired_title": modal["title"],
         "expired_subtitle": modal["subtitle"],
     }
@@ -473,8 +466,6 @@ def _build_config_payload(
     off, off_src = _trial_days_display_offset_for_identity(identity)
     trial_days_left_ui = max(0, trial_days_left + off)
     is_full = mode == "full"
-    # Store-safe default: no auto WebView monetization flow.
-    show_webview = False
     show_upgrade = is_full and not has_access
     show_expired_modal = not has_access
     if not account_registered:
@@ -482,6 +473,7 @@ def _build_config_payload(
         show_expired_modal = False
     management_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
     telegram_url = _resolve_telegram_redirect(uid)
+    telegram_renewal_hint = cloak_telegram_renewal_hint_ru()
 
     mode_meta_common: dict[str, Any] = {
         "checks_count": checks_count,
@@ -514,13 +506,17 @@ def _build_config_payload(
                 "button_text": "Понятно",
                 "expired_title": modal["title"],
                 "expired_subtitle": modal["subtitle"],
+                "telegram_renewal_hint": telegram_renewal_hint,
             }
         else:
             modal, texts = _full_modal_and_texts(
                 trial_active=trial_active,
                 subscription_active=subscription_active,
                 trial_days_left=trial_days_left_ui,
+                telegram_renewal_hint=telegram_renewal_hint,
             )
+            texts = dict(texts)
+            texts["telegram_renewal_hint"] = telegram_renewal_hint
         full_payload = {
             "mode": "full",
             "trial_active": trial_active,
@@ -528,34 +524,25 @@ def _build_config_payload(
             "ui": {
                 "show_trial": trial_active,
                 "show_upgrade": show_upgrade,
-                "show_webview": show_webview,
+                "show_webview": False,
                 "show_expired_modal": show_expired_modal,
                 "show_management_center": show_upgrade,
                 "auto_open_webview": False,
                 "auto_open_delay": 0,
             },
             "modal": modal,
-            "webview": {
-                "title": "Подключение",
-                "subtitle": "Выберите подходящий вариант доступа",
-                "theme": _WEBVIEW_DEFAULT_THEME,
-                "plans": [
-                    {"id": "1m", "title": "1 месяц", "price": "199 ₽"},
-                    {"id": "3m", "title": "3 месяца", "price": "499 ₽"},
-                ],
-                "telegram_url": telegram_url,
-            },
-            # Backward compatible block for old clients.
             "texts": texts,
             "links": {
                 "management_url": telegram_url,
-                "webview_url": telegram_url,
                 "telegram_bot": telegram_url,
                 "fallback_web_url": management_url,
             },
-            "tariffs": _TARIFFS,
             "servers": servers,
             "mode_meta": mode_meta_common,
+            "telegram_cta": {
+                "renewal_hint_ru": telegram_renewal_hint,
+                "open_url": telegram_url,
+            },
         }
         return _deep_merge(full_payload, _get_json_override(_CLOAK_UI_FULL_KEY))
 
@@ -578,13 +565,6 @@ def _build_config_payload(
             "auto_open_delay": 0,
         },
         "modal": modal,
-        "webview": {
-            "title": "Техническая справка",
-            "subtitle": "Режим безопасного интерфейса",
-            "theme": _WEBVIEW_DEFAULT_THEME,
-            "plans": [],
-            "telegram_url": "",
-        },
         "texts": texts,
         "links": {},
         "servers": servers,

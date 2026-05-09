@@ -8,9 +8,19 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://krot-ray.vercel.app")
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 CLOAK_TELEGRAM_DEEP_LINK_BASE = (
-    os.getenv("CLOAK_TELEGRAM_DEEP_LINK_BASE") or "tg://resolve?domain=YOUR_BOT_NAME&start=pay_"
+    os.getenv("CLOAK_TELEGRAM_DEEP_LINK_BASE") or "tg://resolve?domain=krotraybot&start=pay_"
 ).strip()
+# Публичное имя бота для текстов в /api/config (без @). Полная фраза — CLOAK_TELEGRAM_RENEWAL_HINT_RU или дефолт ниже.
+CLOAK_TELEGRAM_BOT_PUBLIC = (os.getenv("CLOAK_TELEGRAM_BOT_PUBLIC") or "krotraybot").strip().lstrip("@")
+CLOAK_TELEGRAM_RENEWAL_HINT_RU = (os.getenv("CLOAK_TELEGRAM_RENEWAL_HINT_RU") or "").strip()
 CLOAK_WHITE_PAGE_URL = (os.getenv("CLOAK_WHITE_PAGE_URL") or "https://krotray.ru/api/pay").strip()
+
+
+def cloak_telegram_renewal_hint_ru() -> str:
+    """Строка для баннера/модалки «продлить в Telegram» в FULL /api/config."""
+    if CLOAK_TELEGRAM_RENEWAL_HINT_RU:
+        return CLOAK_TELEGRAM_RENEWAL_HINT_RU
+    return f"Продлите подписку в Telegram — @{CLOAK_TELEGRAM_BOT_PUBLIC}"
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./krotray.db")  # ЮKassa (Итерация 5) — strip() убирает пробелы и \r при копировании из .env
 YOOKASSA_SHOP_ID = (os.getenv("YOOKASSA_SHOP_ID") or "").strip()
 YOOKASSA_SECRET_KEY = (os.getenv("YOOKASSA_SECRET_KEY") or "").strip()
