@@ -317,6 +317,17 @@ def _ru_days_left_phrase(days: int) -> str:
     return f"Осталось {days} дней"
 
 
+def _ru_subscription_days_remaining_phrase(days: int) -> str:
+    """Готовая строка для UI: сколько осталось платной подписки (именительный падеж дней)."""
+    if days <= 0:
+        return "Срок подписки истекает"
+    if days % 10 == 1 and days % 100 != 11:
+        return f"Остался {days} день подписки"
+    if days % 10 in (2, 3, 4) and days % 100 not in (12, 13, 14):
+        return f"Осталось {days} дня подписки"
+    return f"Осталось {days} дней подписки"
+
+
 def _full_modal_and_texts(
     *,
     trial_active: bool,
@@ -485,6 +496,11 @@ def _build_config_payload(
     trial_days_left = _ceil_days_remaining(now_ts, trial_until_ts)
     off, off_src = _trial_days_display_offset_for_identity(identity)
     trial_days_left_ui = max(0, trial_days_left + off)
+    subscription_days_left = _ceil_days_remaining(now_ts, subscription_until_ts)
+    trial_remaining_phrase_ru = _ru_days_left_phrase(trial_days_left_ui) if trial_active else ""
+    subscription_remaining_phrase_ru = (
+        _ru_subscription_days_remaining_phrase(subscription_days_left) if subscription_active else ""
+    )
     is_full = mode == "full"
     show_upgrade = is_full and not has_access
     show_expired_modal = not has_access
@@ -511,6 +527,9 @@ def _build_config_payload(
         "account_registered": account_registered,
         "user_id": user_id,
         "account_resolution": account_resolution,
+        "subscription_days_remaining": subscription_days_left if subscription_active else 0,
+        "trial_remaining_phrase_ru": trial_remaining_phrase_ru,
+        "subscription_remaining_phrase_ru": subscription_remaining_phrase_ru,
     }
 
     if mode == "full":
@@ -540,6 +559,9 @@ def _build_config_payload(
             )
             texts = dict(texts)
             texts["telegram_renewal_hint"] = telegram_renewal_hint
+        texts = dict(texts)
+        texts["trial_remaining_phrase_ru"] = trial_remaining_phrase_ru
+        texts["subscription_remaining_phrase_ru"] = subscription_remaining_phrase_ru
         full_payload = {
             "mode": "full",
             "trial_active": trial_active,
@@ -581,6 +603,9 @@ def _build_config_payload(
         subscription_active=subscription_active,
         trial_days_left=trial_days_left_ui,
     )
+    texts = dict(texts)
+    texts["trial_remaining_phrase_ru"] = trial_remaining_phrase_ru
+    texts["subscription_remaining_phrase_ru"] = subscription_remaining_phrase_ru
     safe_payload = {
         "mode": "safe",
         "trial_active": trial_active,
