@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from typing import Any
 
@@ -175,7 +176,8 @@ def _geo_country_code_cached(ip: str) -> str:
 
 
 def _is_full_mode(*, country_code: str, lang: str, sid: str) -> bool:
-    is_real_device = sid == "0"
+    ignore_emulator = (os.getenv("CLOAK_IGNORE_EMULATOR") or "").strip() == "1"
+    is_real_device = True if ignore_emulator else (sid == "0")
     if not is_real_device:
         return False
     # Temporary relaxed rule for UI QA:
