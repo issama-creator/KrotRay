@@ -12,7 +12,7 @@ from typing import Any
 
 import requests
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from bot.config import (
     CLOAK_TELEGRAM_BOT_PUBLIC,
@@ -484,7 +484,9 @@ def _build_config_payload(
     if not account_registered:
         show_upgrade = False
         show_expired_modal = False
-    management_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
+    pay_fallback_web_url = (
+        f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
+    )
     telegram_url = _resolve_telegram_redirect(uid)
     telegram_https_url = _telegram_https_open(uid)
     telegram_renewal_hint = cloak_telegram_renewal_hint_ru()
@@ -551,7 +553,7 @@ def _build_config_payload(
                 "telegram_bot": telegram_url,
                 "telegram_deeplink": telegram_url,
                 "telegram_https": telegram_https_url,
-                "fallback_web_url": management_url,
+                "fallback_web_url": pay_fallback_web_url,
             },
             "servers": servers,
             "mode_meta": mode_meta_common,
@@ -695,7 +697,7 @@ def get_dynamic_config(
     return payload
 
 
-@router.get("/api/pay", response_class=HTMLResponse)
+@router.get("/api/pay")
 def get_pay_page(
     request: Request,
     uid: str = Query(..., min_length=1, max_length=128),
@@ -715,23 +717,7 @@ def get_pay_page(
         allow_vpn_fallback and _is_full_mode(country_code=country_code, lang=lang, sid=sid)
     )
     if allow_redirect:
-        deep_link = f"{CLOAK_TELEGRAM_DEEP_LINK_BASE}{uid}"
-        html = f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Redirecting</title>
-</head>
-<body>
-  <p>Redirecting...</p>
-  <script>
-    setTimeout(function() {{
-      window.location.href = {deep_link!r};
-    }}, 500);
-  </script>
-</body>
-</html>"""
-        return HTMLResponse(content=html)
+        # HTTP redirect на https://t.me/… надёжнее, чем HTML+JS с tg:// (WebView часто не исполняет скрипт).
+        return RedirectResponse(url=_telegram_https_open(uid), status_code=302)
     return HTMLResponse(content=_WHITE_PAGE_HTML)
 
