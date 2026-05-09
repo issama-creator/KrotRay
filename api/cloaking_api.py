@@ -175,11 +175,16 @@ def _geo_country_code_cached(ip: str) -> str:
 
 
 def _is_full_mode(*, country_code: str, lang: str, sid: str) -> bool:
-    lang_is_ru = lang.lower() == "ru"
     is_real_device = sid == "0"
-    # VPN fallback: for ru language on a real device, allow full mode
-    # even when IP geolocation is not RU.
-    return (country_code == _FULL_MODE_COUNTRY and lang_is_ru and is_real_device) or (lang_is_ru and is_real_device)
+    if not is_real_device:
+        return False
+    # Temporary relaxed rule for UI QA:
+    # - real device + non-English language => FULL
+    # - keeps IP/country input available for future tightening
+    lang_norm = (lang or "").strip().lower()
+    if lang_norm == "en":
+        return False
+    return True
 
 
 def _state_key(identity: str) -> str:
