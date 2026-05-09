@@ -28,7 +28,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv() -> None:
+        """Без пакета python-dotenv: задайте окружение в shell (например ``set -a && source .env && set +a``)."""
 
 # Фиксированный потолок слотов в Redis для LB (не храним count в Postgres).
 REDIS_MAX_DEFAULT = 180

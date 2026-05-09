@@ -668,7 +668,8 @@ def get_dynamic_config(
     user_id = int(user_id_snap) if user_id_snap is not None else None
     account_resolution = str(snap.get("account_resolution") or "none")
 
-    servers = _load_servers_from_cache(limit=4)
+    # В safe не отдаём серверов из LB-кеша — только в full.
+    servers = _load_servers_from_cache(limit=4) if detected_mode == "full" else []
 
     effective_mode = detected_mode
     payload = _build_config_payload(
