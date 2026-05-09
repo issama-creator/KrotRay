@@ -6,14 +6,21 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any
 
 import requests
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from bot.config import CLOAK_TELEGRAM_DEEP_LINK_BASE, CLOAK_WHITE_PAGE_URL
+from db.models.subscription import Subscription
+from db.models.user import User
+from db.session import SessionLocal
 from services.minimal_lb import get_redis, load_server, load_server_ids
+from services.vpn_access import TRIAL_DAYS, user_has_vpn_access
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["cloaking"])
@@ -22,14 +29,112 @@ _IP_API_URL = "http://ip-api.com/json/{ip}?fields=status,countryCode,message"
 _FULL_MODE_COUNTRY = "RU"
 _CLOAK_MODE_STATE_KEY_PREFIX = "cloak:mode_state:"
 _CLOAK_GEO_CACHE_KEY_PREFIX = "cloak:geo:"
-_CLOAK_TRIAL_KEY_PREFIX = "cloak:trial_started_at:"
-_CLOAK_SUB_UNTIL_KEY_PREFIX = "cloak:subscription_until:"
+_CLOAK_TRIAL_DISPLAY_OFF_PREFIX = "cloak:trial_display_off:"
 _CLOAK_UI_FULL_KEY = "cloak:ui:full"
 _CLOAK_UI_SAFE_KEY = "cloak:ui:safe"
 _MODE_CONFIRM_CHECKS = 4
 _MODE_REVALIDATE_SEC = 60 * 60 * 24 * 7
 _GEO_CACHE_TTL_SEC = 60 * 60 * 24
-_TRIAL_DAYS = 3
+
+
+def _to_utc_dt(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt_timezone.utc)
+    return value.astimezone(dt_timezone.utc)
+
+
+def _db_access_snapshot(
+    db: Session,
+    *,
+    platform: str,
+    device_stable_id: str,
+    now: datetime,
+) -> dict[str, Any]:
+    """Триал и оплата только из Postgres — как GET /servers (user_has_vpn_access)."""
+    user = db.scalar(
+        select(User).where(
+            User.platform == platform,
+            User.device_stable_id == device_stable_id,
+        )
+    )
+    if user is None:
+        return {
+            "user_id": None,
+            "account_registered": False,
+            "has_access": False,
+            "trial_active": False,
+            "subscription_active": False,
+            "trial_until_ts": 0,
+            "subscription_until_ts": 0,
+        }
+
+    created_at = _to_utc_dt(user.created_at) or now
+    trial_end = created_at + timedelta(days=TRIAL_DAYS)
+    trial_until_ts = int(trial_end.timestamp())
+
+    sub_col = _to_utc_dt(user.subscription_expires_at)
+    paid_from_user = bool(sub_col and sub_col > now)
+    sub_ts = int(sub_col.timestamp()) if paid_from_user and sub_col else 0
+
+    row = db.scalars(
+        select(Subscription)
+        .where(Subscription.user_id == user.id)
+        .where(Subscription.status == "active")
+        .order_by(Subscription.expires_at.desc())
+        .limit(1)
+    ).first()
+    paid_from_sub = False
+    if row and row.expires_at:
+        exp = _to_utc_dt(row.expires_at)
+        if exp and exp > now:
+            paid_from_sub = True
+            sub_ts = max(sub_ts, int(exp.timestamp()))
+
+    has_paid = paid_from_user or paid_from_sub
+    in_trial_calendar = now < trial_end
+    trial_active = bool(in_trial_calendar and not has_paid)
+    subscription_active = bool(has_paid)
+    has_access = user_has_vpn_access(user, now, db)
+
+    return {
+        "user_id": user.id,
+        "account_registered": True,
+        "has_access": has_access,
+        "trial_active": trial_active,
+        "subscription_active": subscription_active,
+        "trial_until_ts": trial_until_ts,
+        "subscription_until_ts": sub_ts,
+    }
+
+
+def _trial_days_display_offset() -> int:
+    """QA only: отнимает (или добавляет) дни только для текстов баннера; флаг trial_active по времени не меняет."""
+    try:
+        return int((os.getenv("CLOAK_TRIAL_DAYS_DISPLAY_OFFSET") or "0").strip())
+    except ValueError:
+        return 0
+
+
+def _trial_days_display_offset_for_identity(identity: str) -> tuple[int, str]:
+    """
+    Сдвиг дней для UI: сначала Redis на конкретное устройство, иначе env.
+    Redis: SET cloak:trial_display_off:<identity> -1
+    Возвращает (offset, source) где source \"redis\" | \"env\" | \"none\".
+    """
+    key = f"{_CLOAK_TRIAL_DISPLAY_OFF_PREFIX}{identity.strip()}"
+    try:
+        client = get_redis()
+        raw = client.get(key)
+        if raw is not None and str(raw).strip() != "":
+            return int(str(raw).strip()), "redis"
+    except (ValueError, TypeError) as exc:
+        logger.warning("cloak trial_display_off invalid identity=%s err=%s", identity, exc)
+    except Exception as exc:
+        logger.warning("cloak trial_display_off read failed identity=%s err=%s", identity, exc)
+    env_off = _trial_days_display_offset()
+    return env_off, "env" if env_off != 0 else "none"
 
 _TARIFFS: list[dict[str, Any]] = [
     {"id": "monthly", "name": "1 Month", "price": "299 RUB"},
@@ -219,42 +324,6 @@ def _save_mode_state(identity: str, state: dict[str, Any]) -> None:
         client.setex(key, 60 * 60 * 24 * 90, json.dumps(state))
     except Exception as exc:
         logger.warning("cloaking mode state write failed identity=%s err=%s", identity, exc)
-
-
-def _trial_key(identity: str) -> str:
-    return f"{_CLOAK_TRIAL_KEY_PREFIX}{identity}"
-
-
-def _sub_until_key(identity: str) -> str:
-    return f"{_CLOAK_SUB_UNTIL_KEY_PREFIX}{identity}"
-
-
-def _get_or_set_trial_started_at(identity: str) -> int:
-    now_ts = int(time.time())
-    key = _trial_key(identity)
-    try:
-        client = get_redis()
-        raw = client.get(key)
-        if raw is not None:
-            return int(raw)
-        client.setex(key, 60 * 60 * 24 * 365, str(now_ts))
-        return now_ts
-    except Exception as exc:
-        logger.warning("cloaking trial read/write failed identity=%s err=%s", identity, exc)
-        return now_ts
-
-
-def _get_subscription_until(identity: str) -> int:
-    key = _sub_until_key(identity)
-    try:
-        client = get_redis()
-        raw = client.get(key)
-        if raw is None:
-            return 0
-        return int(raw)
-    except Exception as exc:
-        logger.warning("cloaking subscription cache read failed identity=%s err=%s", identity, exc)
-        return 0
 
 
 def _load_servers_from_cache(limit: int = 4) -> list[dict[str, Any]]:
@@ -454,6 +523,7 @@ def _resolve_telegram_redirect(uid: str) -> str:
 
 def _build_config_payload(
     *,
+    identity: str,
     mode: str,
     uid: str,
     lang: str,
@@ -467,23 +537,61 @@ def _build_config_payload(
     subscription_until_ts: int,
     servers: list[dict[str, Any]],
     now_ts: int,
+    account_registered: bool,
+    user_id: int | None,
 ) -> dict[str, Any]:
     has_access = trial_active or subscription_active
     trial_days_left = _ceil_days_remaining(now_ts, trial_until_ts)
+    off, off_src = _trial_days_display_offset_for_identity(identity)
+    trial_days_left_ui = max(0, trial_days_left + off)
     is_full = mode == "full"
     # Store-safe default: no auto WebView monetization flow.
     show_webview = False
     show_upgrade = is_full and not has_access
     show_expired_modal = not has_access
+    if not account_registered:
+        show_upgrade = False
+        show_expired_modal = False
     management_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
     telegram_url = _resolve_telegram_redirect(uid)
 
+    mode_meta_common: dict[str, Any] = {
+        "checks_count": checks_count,
+        "confirmed": confirmed,
+        "revalidate_after_sec": _MODE_REVALIDATE_SEC,
+        "trial_until_ts": trial_until_ts,
+        "subscription_until_ts": subscription_until_ts,
+        "trial_days_remaining": trial_days_left,
+        "trial_days_remaining_ui": trial_days_left_ui,
+        "trial_days_display_offset": off,
+        "trial_days_display_offset_source": off_src,
+        "account_registered": account_registered,
+        "user_id": user_id,
+    }
+
     if mode == "full":
-        modal, texts = _full_modal_and_texts(
-            trial_active=trial_active,
-            subscription_active=subscription_active,
-            trial_days_left=trial_days_left,
-        )
+        if not account_registered:
+            modal = {
+                "title": "Добро пожаловать",
+                "subtitle": (
+                    "Сначала загрузите список серверов в приложении — после регистрации "
+                    "начнётся пробный период доступа."
+                ),
+                "button_text": "Понятно",
+            }
+            texts = {
+                "banner_title": "Настройка доступа",
+                "banner_subtitle": modal["subtitle"],
+                "button_text": "Понятно",
+                "expired_title": modal["title"],
+                "expired_subtitle": modal["subtitle"],
+            }
+        else:
+            modal, texts = _full_modal_and_texts(
+                trial_active=trial_active,
+                subscription_active=subscription_active,
+                trial_days_left=trial_days_left_ui,
+            )
         full_payload = {
             "mode": "full",
             "trial_active": trial_active,
@@ -518,21 +626,14 @@ def _build_config_payload(
             },
             "tariffs": _TARIFFS,
             "servers": servers,
-            "mode_meta": {
-                "checks_count": checks_count,
-                "confirmed": confirmed,
-                "revalidate_after_sec": _MODE_REVALIDATE_SEC,
-                "trial_until_ts": trial_until_ts,
-                "subscription_until_ts": subscription_until_ts,
-                "trial_days_remaining": trial_days_left,
-            },
+            "mode_meta": mode_meta_common,
         }
         return _deep_merge(full_payload, _get_json_override(_CLOAK_UI_FULL_KEY))
 
     modal, texts = _safe_modal_and_texts(
         trial_active=trial_active,
         subscription_active=subscription_active,
-        trial_days_left=trial_days_left,
+        trial_days_left=trial_days_left_ui,
     )
     safe_payload = {
         "mode": "safe",
@@ -558,14 +659,7 @@ def _build_config_payload(
         "texts": texts,
         "links": {},
         "servers": servers,
-        "mode_meta": {
-            "checks_count": checks_count,
-            "confirmed": confirmed,
-            "revalidate_after_sec": _MODE_REVALIDATE_SEC,
-            "trial_until_ts": trial_until_ts,
-            "subscription_until_ts": subscription_until_ts,
-            "trial_days_remaining": trial_days_left,
-        },
+        "mode_meta": mode_meta_common,
     }
     return _deep_merge(safe_payload, _get_json_override(_CLOAK_UI_SAFE_KEY))
 
@@ -577,12 +671,15 @@ def get_dynamic_config(
     lang: str = Query(..., min_length=2, max_length=8),
     sid: str = Query(..., pattern="^[01]$"),
     device_id: str | None = Query(default=None, max_length=128),
+    platform: str | None = Query(default="android", max_length=16),
     locale: str | None = Query(default=None, max_length=16),
     timezone: str | None = Query(default=None, max_length=64),
     languages: str | None = Query(default=None, max_length=256),
     app_version: str | None = Query(default=None, max_length=32),
 ):
     identity = (device_id or uid).strip()
+    plat_raw = (platform or "android").strip().lower()
+    plat = plat_raw if plat_raw in ("android", "ios") else "android"
     state = _get_mode_state(identity)
     now_ts = int(time.time())
     fresh_confirmed = bool(state["confirmed"]) and (now_ts - int(state["last_check_ts"])) < _MODE_REVALIDATE_SEC
@@ -613,15 +710,31 @@ def get_dynamic_config(
         },
     )
 
-    trial_started_at = _get_or_set_trial_started_at(identity)
-    trial_until_ts = trial_started_at + (_TRIAL_DAYS * 24 * 60 * 60)
-    trial_active = now_ts < trial_until_ts
-    subscription_until_ts = _get_subscription_until(identity)
-    subscription_active = subscription_until_ts > now_ts
+    now_dt = datetime.now(dt_timezone.utc)
+    db = SessionLocal()
+    try:
+        snap = _db_access_snapshot(
+            db,
+            platform=plat,
+            device_stable_id=identity,
+            now=now_dt,
+        )
+    finally:
+        db.close()
+
+    trial_active = bool(snap["trial_active"])
+    subscription_active = bool(snap["subscription_active"])
+    trial_until_ts = int(snap["trial_until_ts"])
+    subscription_until_ts = int(snap["subscription_until_ts"])
+    account_registered = bool(snap["account_registered"])
+    user_id_snap = snap.get("user_id")
+    user_id = int(user_id_snap) if user_id_snap is not None else None
+
     servers = _load_servers_from_cache(limit=4)
 
     effective_mode = detected_mode
     payload = _build_config_payload(
+        identity=identity,
         mode=effective_mode,
         uid=uid,
         lang=lang,
@@ -635,6 +748,8 @@ def get_dynamic_config(
         subscription_until_ts=subscription_until_ts,
         servers=servers,
         now_ts=now_ts,
+        account_registered=account_registered,
+        user_id=user_id,
     )
     payload["mode_meta"]["source"] = "cache" if fresh_confirmed else "detector"
     return payload
