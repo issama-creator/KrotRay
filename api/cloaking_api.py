@@ -23,6 +23,8 @@ _CLOAK_MODE_STATE_KEY_PREFIX = "cloak:mode_state:"
 _CLOAK_GEO_CACHE_KEY_PREFIX = "cloak:geo:"
 _CLOAK_TRIAL_KEY_PREFIX = "cloak:trial_started_at:"
 _CLOAK_SUB_UNTIL_KEY_PREFIX = "cloak:subscription_until:"
+_CLOAK_UI_FULL_KEY = "cloak:ui:full"
+_CLOAK_UI_SAFE_KEY = "cloak:ui:safe"
 _MODE_CONFIRM_CHECKS = 4
 _MODE_REVALIDATE_SEC = 60 * 60 * 24 * 7
 _GEO_CACHE_TTL_SEC = 60 * 60 * 24
@@ -33,6 +35,12 @@ _TARIFFS: list[dict[str, Any]] = [
     {"id": "quarterly", "name": "3 Months", "price": "799 RUB"},
     {"id": "semiannual", "name": "6 Months", "price": "1399 RUB"},
 ]
+_WEBVIEW_DEFAULT_THEME = {
+    "primary_color": "#3B82F6",
+    "background_color": "#0F172A",
+    "card_color": "#111827",
+    "text_color": "#FFFFFF",
+}
 
 _WHITE_PAGE_HTML = """<!doctype html>
 <html lang="en">
@@ -270,6 +278,40 @@ def _load_servers_from_cache(limit: int = 4) -> list[dict[str, Any]]:
         return []
 
 
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _get_json_override(key: str) -> dict[str, Any]:
+    try:
+        client = get_redis()
+        raw = client.get(key)
+        if not raw:
+            return {}
+        parsed = json.loads(str(raw))
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception as exc:
+        logger.warning("cloaking ui override read failed key=%s err=%s", key, exc)
+    return {}
+
+
+def _resolve_telegram_redirect(uid: str) -> str:
+    custom = _get_json_override(_CLOAK_UI_FULL_KEY).get("webview", {}).get("telegram_url", "")
+    custom_url = str(custom or "").strip()
+    if custom_url:
+        if "{uid}" in custom_url:
+            return custom_url.replace("{uid}", uid)
+        return custom_url
+    return f"{CLOAK_TELEGRAM_DEEP_LINK_BASE}{uid}"
+
+
 def _build_config_payload(
     *,
     mode: str,
@@ -293,7 +335,7 @@ def _build_config_payload(
     management_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
 
     if mode == "full":
-        return {
+        full_payload = {
             "mode": "full",
             "trial_active": trial_active,
             "subscription_active": subscription_active,
@@ -303,10 +345,28 @@ def _build_config_payload(
                 "show_webview": show_webview,
                 "show_expired_modal": show_expired_modal,
                 "show_management_center": show_webview,
+                "auto_open_webview": show_webview,
+                "auto_open_delay": 3000,
             },
+            "modal": {
+                "title": "Бесплатный период завершён",
+                "subtitle": "Для продления доступа перейдите в нашего Telegram-бота",
+                "button_text": "Перейти в Telegram",
+            },
+            "webview": {
+                "title": "Подключение",
+                "subtitle": "Выберите подходящий вариант доступа",
+                "theme": _WEBVIEW_DEFAULT_THEME,
+                "plans": [
+                    {"id": "1m", "title": "1 месяц", "price": "199 ₽"},
+                    {"id": "3m", "title": "3 месяца", "price": "499 ₽"},
+                ],
+                "telegram_url": _resolve_telegram_redirect(uid),
+            },
+            # Backward compatible block for old clients.
             "texts": {
-                "banner_title": "Ostalsya 1 den",
-                "banner_subtitle": "Dlya prodolzheniya potrebuyetsya konfiguratsiya",
+                "banner_title": "Остался 1 день",
+                "banner_subtitle": "Для продолжения потребуется конфигурация",
                 "button_text": "Перейти в Telegram",
                 "expired_title": "Бесплатный период завершён",
                 "expired_subtitle": "Для продления доступа перейдите в нашего Telegram-бота",
@@ -326,7 +386,9 @@ def _build_config_payload(
                 "subscription_until_ts": subscription_until_ts,
             },
         }
-    return {
+        return _deep_merge(full_payload, _get_json_override(_CLOAK_UI_FULL_KEY))
+
+    safe_payload = {
         "mode": "safe",
         "trial_active": trial_active,
         "subscription_active": subscription_active,
@@ -336,10 +398,24 @@ def _build_config_payload(
             "show_webview": False,
             "show_expired_modal": show_expired_modal,
             "show_management_center": False,
+            "auto_open_webview": False,
+            "auto_open_delay": 0,
+        },
+        "modal": {
+            "title": "Добавьте конфигурацию",
+            "subtitle": "Импортируйте конфигурацию для подключения",
+            "button_text": "Понятно",
+        },
+        "webview": {
+            "title": "Техническая справка",
+            "subtitle": "Режим безопасного интерфейса",
+            "theme": _WEBVIEW_DEFAULT_THEME,
+            "plans": [],
+            "telegram_url": "",
         },
         "texts": {
-            "empty_title": "Dobavte konfiguratsiyu",
-            "empty_subtitle": "Importiruyte konfiguratsiyu dlya podklyucheniya",
+            "empty_title": "Добавьте конфигурацию",
+            "empty_subtitle": "Импортируйте конфигурацию для подключения",
             "technical_note": (
                 "Technical Guide: this build currently exposes protocol documentation only. "
                 f"Detailed notes are available at {CLOAK_WHITE_PAGE_URL}."
@@ -355,6 +431,7 @@ def _build_config_payload(
             "subscription_until_ts": subscription_until_ts,
         },
     }
+    return _deep_merge(safe_payload, _get_json_override(_CLOAK_UI_SAFE_KEY))
 
 
 @router.get("/api/config")
