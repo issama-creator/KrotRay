@@ -309,6 +309,139 @@ def _get_json_override(key: str) -> dict[str, Any]:
     return {}
 
 
+def _ceil_days_remaining(now_ts: int, until_ts: int) -> int:
+    if until_ts <= now_ts:
+        return 0
+    return (until_ts - now_ts + 86399) // 86400
+
+
+def _ru_days_left_phrase(days: int) -> str:
+    """Russian pluralization for \"остался X день\" style banners."""
+    if days <= 0:
+        return "Пробный период завершается"
+    if days % 10 == 1 and days % 100 != 11:
+        return f"Остался {days} день"
+    if days % 10 in (2, 3, 4) and days % 100 not in (12, 13, 14):
+        return f"Осталось {days} дня"
+    return f"Осталось {days} дней"
+
+
+def _full_modal_and_texts(
+    *,
+    trial_active: bool,
+    subscription_active: bool,
+    trial_days_left: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """modal + texts aligned with trial/subscription state (single source of truth)."""
+    if subscription_active:
+        modal = {
+            "title": "Доступ активен",
+            "subtitle": "Подключение доступно по вашей конфигурации.",
+            "button_text": "Понятно",
+        }
+        texts = {
+            "banner_title": "Доступ активен",
+            "banner_subtitle": "Используйте конфигурацию для подключения.",
+            "button_text": "Понятно",
+            "expired_title": modal["title"],
+            "expired_subtitle": modal["subtitle"],
+        }
+        return modal, texts
+
+    if trial_active:
+        banner = _ru_days_left_phrase(trial_days_left)
+        sub = "Импортируйте конфигурацию и подключитесь, пока действует пробный период."
+        modal = {
+            "title": "Пробный доступ активен",
+            "subtitle": sub,
+            "button_text": "Понятно",
+        }
+        texts = {
+            "banner_title": banner,
+            "banner_subtitle": sub,
+            "button_text": "Понятно",
+            "expired_title": "Бесплатный период завершён",
+            "expired_subtitle": "Для продления доступа откройте центр управления.",
+        }
+        return modal, texts
+
+    # No trial / no subscription — expired managed flow (FULL)
+    modal = {
+        "title": "Бесплатный период завершён",
+        "subtitle": "Для продления доступа откройте центр управления.",
+        "button_text": "Открыть центр управления",
+    }
+    texts = {
+        "banner_title": "Доступ к подключению недоступен",
+        "banner_subtitle": "Откройте центр управления, чтобы продолжить.",
+        "button_text": "Открыть центр управления",
+        "expired_title": modal["title"],
+        "expired_subtitle": modal["subtitle"],
+    }
+    return modal, texts
+
+
+def _safe_modal_and_texts(
+    *,
+    trial_active: bool,
+    subscription_active: bool,
+    trial_days_left: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if subscription_active:
+        banner = "Доступ активен"
+        modal = {
+            "title": banner,
+            "subtitle": "Используйте конфигурацию для подключения.",
+            "button_text": "Понятно",
+        }
+        texts = {
+            "empty_title": banner,
+            "empty_subtitle": "Импортируйте или обновите конфигурацию при необходимости.",
+            "technical_note": (
+                "Technical Guide: this build currently exposes protocol documentation only. "
+                f"Detailed notes are available at {CLOAK_WHITE_PAGE_URL}."
+            ),
+            "banner_title": banner,
+            "banner_subtitle": modal["subtitle"],
+        }
+        return modal, texts
+
+    if trial_active:
+        banner = _ru_days_left_phrase(trial_days_left)
+        sub = "Импортируйте конфигурацию и подключитесь, пока действует пробный период."
+        modal = {
+            "title": "Пробный доступ активен",
+            "subtitle": sub,
+            "button_text": "Понятно",
+        }
+        texts = {
+            "empty_title": banner,
+            "empty_subtitle": sub,
+            "technical_note": (
+                "Technical Guide: this build currently exposes protocol documentation only. "
+                f"Detailed notes are available at {CLOAK_WHITE_PAGE_URL}."
+            ),
+            "banner_title": banner,
+            "banner_subtitle": sub,
+        }
+        return modal, texts
+
+    modal = {
+        "title": "Добавьте конфигурацию",
+        "subtitle": "Импортируйте конфигурацию для подключения",
+        "button_text": "Понятно",
+    }
+    texts = {
+        "empty_title": modal["title"],
+        "empty_subtitle": modal["subtitle"],
+        "technical_note": (
+            "Technical Guide: this build currently exposes protocol documentation only. "
+            f"Detailed notes are available at {CLOAK_WHITE_PAGE_URL}."
+        ),
+    }
+    return modal, texts
+
+
 def _resolve_telegram_redirect(uid: str) -> str:
     custom = _get_json_override(_CLOAK_UI_FULL_KEY).get("webview", {}).get("telegram_url", "")
     custom_url = str(custom or "").strip()
@@ -333,8 +466,10 @@ def _build_config_payload(
     trial_until_ts: int,
     subscription_until_ts: int,
     servers: list[dict[str, Any]],
+    now_ts: int,
 ) -> dict[str, Any]:
     has_access = trial_active or subscription_active
+    trial_days_left = _ceil_days_remaining(now_ts, trial_until_ts)
     is_full = mode == "full"
     # Store-safe default: no auto WebView monetization flow.
     show_webview = False
@@ -344,6 +479,11 @@ def _build_config_payload(
     telegram_url = _resolve_telegram_redirect(uid)
 
     if mode == "full":
+        modal, texts = _full_modal_and_texts(
+            trial_active=trial_active,
+            subscription_active=subscription_active,
+            trial_days_left=trial_days_left,
+        )
         full_payload = {
             "mode": "full",
             "trial_active": trial_active,
@@ -357,11 +497,7 @@ def _build_config_payload(
                 "auto_open_webview": False,
                 "auto_open_delay": 0,
             },
-            "modal": {
-                "title": "Бесплатный период завершён",
-                "subtitle": "Для продления доступа перейдите в нашего Telegram-бота",
-                "button_text": "Перейти в Telegram",
-            },
+            "modal": modal,
             "webview": {
                 "title": "Подключение",
                 "subtitle": "Выберите подходящий вариант доступа",
@@ -373,13 +509,7 @@ def _build_config_payload(
                 "telegram_url": telegram_url,
             },
             # Backward compatible block for old clients.
-            "texts": {
-                "banner_title": "Остался 1 день",
-                "banner_subtitle": "Для продолжения потребуется конфигурация",
-                "button_text": "Перейти в Telegram",
-                "expired_title": "Бесплатный период завершён",
-                "expired_subtitle": "Для продления доступа перейдите в нашего Telegram-бота",
-            },
+            "texts": texts,
             "links": {
                 "management_url": telegram_url,
                 "webview_url": telegram_url,
@@ -394,10 +524,16 @@ def _build_config_payload(
                 "revalidate_after_sec": _MODE_REVALIDATE_SEC,
                 "trial_until_ts": trial_until_ts,
                 "subscription_until_ts": subscription_until_ts,
+                "trial_days_remaining": trial_days_left,
             },
         }
         return _deep_merge(full_payload, _get_json_override(_CLOAK_UI_FULL_KEY))
 
+    modal, texts = _safe_modal_and_texts(
+        trial_active=trial_active,
+        subscription_active=subscription_active,
+        trial_days_left=trial_days_left,
+    )
     safe_payload = {
         "mode": "safe",
         "trial_active": trial_active,
@@ -411,11 +547,7 @@ def _build_config_payload(
             "auto_open_webview": False,
             "auto_open_delay": 0,
         },
-        "modal": {
-            "title": "Добавьте конфигурацию",
-            "subtitle": "Импортируйте конфигурацию для подключения",
-            "button_text": "Понятно",
-        },
+        "modal": modal,
         "webview": {
             "title": "Техническая справка",
             "subtitle": "Режим безопасного интерфейса",
@@ -423,14 +555,7 @@ def _build_config_payload(
             "plans": [],
             "telegram_url": "",
         },
-        "texts": {
-            "empty_title": "Добавьте конфигурацию",
-            "empty_subtitle": "Импортируйте конфигурацию для подключения",
-            "technical_note": (
-                "Technical Guide: this build currently exposes protocol documentation only. "
-                f"Detailed notes are available at {CLOAK_WHITE_PAGE_URL}."
-            ),
-        },
+        "texts": texts,
         "links": {},
         "servers": servers,
         "mode_meta": {
@@ -439,6 +564,7 @@ def _build_config_payload(
             "revalidate_after_sec": _MODE_REVALIDATE_SEC,
             "trial_until_ts": trial_until_ts,
             "subscription_until_ts": subscription_until_ts,
+            "trial_days_remaining": trial_days_left,
         },
     }
     return _deep_merge(safe_payload, _get_json_override(_CLOAK_UI_SAFE_KEY))
@@ -508,6 +634,7 @@ def get_dynamic_config(
         trial_until_ts=trial_until_ts,
         subscription_until_ts=subscription_until_ts,
         servers=servers,
+        now_ts=now_ts,
     )
     payload["mode_meta"]["source"] = "cache" if fresh_confirmed else "detector"
     return payload
