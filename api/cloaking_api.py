@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import time
+from urllib.parse import quote
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
@@ -14,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
 from bot.config import (
+    CLOAK_TELEGRAM_BOT_PUBLIC,
     CLOAK_TELEGRAM_DEEP_LINK_BASE,
     CLOAK_WHITE_PAGE_URL,
     cloak_telegram_renewal_hint_ru,
@@ -441,6 +443,17 @@ def _resolve_telegram_redirect(uid: str) -> str:
     return f"{CLOAK_TELEGRAM_DEEP_LINK_BASE}{uid}"
 
 
+def _telegram_pay_start_param(uid: str) -> str:
+    """Параметр deep link start (совпадает с суффиксом после pay_ в CLOAK_TELEGRAM_DEEP_LINK_BASE)."""
+    return f"pay_{uid}"
+
+
+def _telegram_https_open(uid: str) -> str:
+    """https://t.me/<bot>?start=... — надёжнее открывается с мобильных, чем только tg://."""
+    start = quote(_telegram_pay_start_param(uid), safe="")
+    return f"https://t.me/{CLOAK_TELEGRAM_BOT_PUBLIC}?start={start}"
+
+
 def _build_config_payload(
     *,
     identity: str,
@@ -473,6 +486,7 @@ def _build_config_payload(
         show_expired_modal = False
     management_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
     telegram_url = _resolve_telegram_redirect(uid)
+    telegram_https_url = _telegram_https_open(uid)
     telegram_renewal_hint = cloak_telegram_renewal_hint_ru()
 
     mode_meta_common: dict[str, Any] = {
@@ -535,12 +549,18 @@ def _build_config_payload(
             "links": {
                 "management_url": telegram_url,
                 "telegram_bot": telegram_url,
+                "telegram_deeplink": telegram_url,
+                "telegram_https": telegram_https_url,
                 "fallback_web_url": management_url,
             },
             "servers": servers,
             "mode_meta": mode_meta_common,
             "telegram_cta": {
                 "renewal_hint_ru": telegram_renewal_hint,
+                "bot_username": CLOAK_TELEGRAM_BOT_PUBLIC,
+                "start_param": _telegram_pay_start_param(uid),
+                "deeplink": telegram_url,
+                "https_url": telegram_https_url,
                 "open_url": telegram_url,
             },
         }
