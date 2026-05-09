@@ -336,10 +336,12 @@ def _build_config_payload(
 ) -> dict[str, Any]:
     has_access = trial_active or subscription_active
     is_full = mode == "full"
-    show_webview = is_full and not has_access
+    # Store-safe default: no auto WebView monetization flow.
+    show_webview = False
     show_upgrade = is_full and not has_access
     show_expired_modal = not has_access
     management_url = f"{request.base_url}api/pay?uid={uid}&lang={lang}&sid={sid}&device_id={uid}".replace(" ", "")
+    telegram_url = _resolve_telegram_redirect(uid)
 
     if mode == "full":
         full_payload = {
@@ -351,9 +353,9 @@ def _build_config_payload(
                 "show_upgrade": show_upgrade,
                 "show_webview": show_webview,
                 "show_expired_modal": show_expired_modal,
-                "show_management_center": show_webview,
-                "auto_open_webview": show_webview,
-                "auto_open_delay": 3000,
+                "show_management_center": show_upgrade,
+                "auto_open_webview": False,
+                "auto_open_delay": 0,
             },
             "modal": {
                 "title": "Бесплатный период завершён",
@@ -368,7 +370,7 @@ def _build_config_payload(
                     {"id": "1m", "title": "1 месяц", "price": "199 ₽"},
                     {"id": "3m", "title": "3 месяца", "price": "499 ₽"},
                 ],
-                "telegram_url": _resolve_telegram_redirect(uid),
+                "telegram_url": telegram_url,
             },
             # Backward compatible block for old clients.
             "texts": {
@@ -379,9 +381,10 @@ def _build_config_payload(
                 "expired_subtitle": "Для продления доступа перейдите в нашего Telegram-бота",
             },
             "links": {
-                "management_url": management_url,
-                "webview_url": management_url,
-                "telegram_bot": CLOAK_TELEGRAM_DEEP_LINK_BASE,
+                "management_url": telegram_url,
+                "webview_url": telegram_url,
+                "telegram_bot": telegram_url,
+                "fallback_web_url": management_url,
             },
             "tariffs": _TARIFFS,
             "servers": servers,
