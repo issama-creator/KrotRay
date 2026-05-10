@@ -703,8 +703,13 @@ def get_dynamic_config(
     user_id = int(user_id_snap) if user_id_snap is not None else None
     account_resolution = str(snap.get("account_resolution") or "none")
 
-    # В safe не отдаём серверов из LB-кеша — только в full.
-    servers = _load_servers_from_cache(limit=4) if detected_mode == "full" else []
+    has_access = bool(snap.get("has_access"))
+    # Превью servers только при живом доступе (триал или оплата). Иначе не светим хосты в конфиге.
+    servers = (
+        _load_servers_from_cache(limit=4)
+        if detected_mode == "full" and has_access
+        else []
+    )
 
     effective_mode = detected_mode
     payload = _build_config_payload(
