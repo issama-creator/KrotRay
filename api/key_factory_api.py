@@ -275,6 +275,25 @@ def _payload_servers_ok(user: User, servers_norm: list[dict[str, Any]]) -> dict[
     return {"account_id": user.id, "servers": servers_norm}
 
 
+def _release_cached_assignment_load(client: Redis, account_id: int) -> None:
+    """
+    При истечении триала/подписки снимаем виртуальную нагрузку с узлов (как при refresh:
+    по −0.25 на каждый сервер из сохранённой четвёрки) и удаляем кэш назначения.
+    """
+    try:
+        cached = get_cached_user(client, account_id)
+        if not cached:
+            invalidate_user_assignment(client, account_id)
+            return
+        items = _assignment_items_from_cache(cached.get("servers"))
+        normed = _normalize_servers(items)
+        if normed:
+            apply_deassign(client, normed, amount=0.25)
+        invalidate_user_assignment(client, account_id)
+    except RedisError:
+        logger.warning("release_cached_assignment_load redis failed account_id=%s", account_id)
+
+
 @router.get("/servers", summary="Четвёрка серверов (trial / подписка)")
 def get_servers(
     key: str | None = Query(None, max_length=64, description="Ключ из ЛК после оплаты; вместе с platform+device_stable_id"),
@@ -307,17 +326,19 @@ def get_servers(
     )
     if pre_err == "invalid_key":
         return {"account_id": None, "error": "invalid_key"}
+    redis_client = get_redis()
     if pre_err == "subscription_required":
         assert user is not None
+        _release_cached_assignment_load(redis_client, user.id)
         return {"account_id": user.id, "error": "subscription_required"}
     if pre_err == "device_limit":
         assert user is not None
         return {"account_id": user.id, "error": "device_limit"}
     assert user is not None
     if not user_has_vpn_access(user, now_dt, db):
+        _release_cached_assignment_load(redis_client, user.id)
         return {"account_id": user.id, "error": "subscription_required"}
 
-    redis_client = get_redis()
     aid = user.id
     try:
         cached = get_cached_user(redis_client, aid)
@@ -388,17 +409,19 @@ def refresh_servers(body: RefreshBody, db: Session = Depends(get_db)) -> dict[st
     )
     if pre_err == "invalid_key":
         return {"account_id": None, "error": "invalid_key"}
+    redis_client = get_redis()
     if pre_err == "subscription_required":
         assert user is not None
+        _release_cached_assignment_load(redis_client, user.id)
         return {"account_id": user.id, "error": "subscription_required"}
     if pre_err == "device_limit":
         assert user is not None
         return {"account_id": user.id, "error": "device_limit"}
     assert user is not None
     if not user_has_vpn_access(user, now_dt, db):
+        _release_cached_assignment_load(redis_client, user.id)
         return {"account_id": user.id, "error": "subscription_required"}
 
-    redis_client = get_redis()
     aid = user.id
 
     lock = _assignment_lock(redis_client, aid)
